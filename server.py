@@ -861,27 +861,32 @@ async def stream(ws: WebSocket):
         recv_task.cancel()
         return
 
-    mrt = get_model()
-    num_notes = mrt._num_notes
-    drum_tokens = mrt._drum_tokens
-    state = None
-    step = 0
-
-    # --- Adaptive pacing & chunk sizing -------------------------------------
-    # Apply new input as fast as possible (small chunk + small buffer lead)
-    # while never starving the audio buffer (no jitter). The server times its
-    # own generation and: (a) sizes the free-run chunk so generation stays
-    # comfortably faster than real time, (b) keeps a buffer "lead" covering the
-    # worst recent generation time, (c) self-paces (sleeps) so it never runs
-    # more than that lead ahead — which also stops latency from creeping up.
-    chunk = max(CHUNK_MIN, min(CHUNK_MAX, int(init.get("chunk", STREAM_FRAMES))))
-    rtf_hist = deque(maxlen=10)   # recent real-time factors (gen / audio)
-    gen_hist = deque(maxlen=10)   # recent generation times (seconds)
-    target_lead = 0.40            # seconds of audio to keep buffered ahead
-    t_start = None                # ~ when playback began (first chunk sent)
-    audio_sent = 0.0              # cumulative seconds of audio sent
-
     try:
+        # Everything from here is inside the try whose `finally` releases the lock,
+        # so a stream can NEVER wedge the single-stream lock for everyone else —
+        # even if model loading fails or the client drops mid-setup. The model is
+        # loaded OFF the event loop (first call is slow) so a slow load can't
+        # freeze the server while the client/funnel times out.
+        mrt = await loop.run_in_executor(_gen_executor, get_model)
+        num_notes = mrt._num_notes
+        drum_tokens = mrt._drum_tokens
+        state = None
+        step = 0
+
+        # --- Adaptive pacing & chunk sizing ---------------------------------
+        # Apply new input as fast as possible (small chunk + small buffer lead)
+        # while never starving the audio buffer (no jitter). The server times its
+        # own generation and: (a) sizes the free-run chunk so generation stays
+        # comfortably faster than real time, (b) keeps a buffer "lead" covering the
+        # worst recent generation time, (c) self-paces (sleeps) so it never runs
+        # more than that lead ahead — which also stops latency from creeping up.
+        chunk = max(CHUNK_MIN, min(CHUNK_MAX, int(init.get("chunk", STREAM_FRAMES))))
+        rtf_hist = deque(maxlen=10)   # recent real-time factors (gen / audio)
+        gen_hist = deque(maxlen=10)   # recent generation times (seconds)
+        target_lead = 0.40            # seconds of audio to keep buffered ahead
+        t_start = None                # ~ when playback began (first chunk sent)
+        audio_sent = 0.0              # cumulative seconds of audio sent
+
         await ws.send_json({"type": "ready", "sample_rate": int(mrt._sample_rate)})
         while not ctl["stop"]:
             seq = ctl["seq"]
