@@ -960,6 +960,7 @@ function waveFrame(t) {
 // ---- Web Audio streaming playback -----------------------------------------
 let ctx = null, nextTime = 0, sampleRate = 48000;
 let ws = null, playing = false, chunksPlayed = 0;
+let userStop = false, everReady = false, reconnectN = 0;   // auto-reconnect state
 
 function paramsMsg() {
   return {
@@ -1004,18 +1005,22 @@ function playChunk(arrayBuf) {
 }
 
 async function start(seed) {
+  userStop = false;
   $("play").disabled = true;
   setDot("loading");
-  log("⏳ Preparing… (first play loads ~9GB of weights — can take a minute)");
+  log(!everReady ? "⏳ Preparing… (first play loads ~9GB of weights — can take a minute)"
+      : reconnectN > 0 ? "🔁 Reconnecting…" : "⏳ Preparing…");
   let sj;
   if (seed && seed.token) { sj = seed; }   // start from a given style (e.g. a pinned place)
   else {
     try { sj = await prepareStyle(); }
     catch (e) { log("⚠️ " + e.message); $("play").disabled = false; setDot(""); return; }
   }
+  if (userStop) return;   // user paused mid-prepare
   const token = sj.token;
   drawEmbedding(sj);
 
+  try { if (ctx) ctx.close(); } catch {}
   ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
   await ctx.resume();
   nextTime = ctx.currentTime;
@@ -1030,17 +1035,33 @@ async function start(seed) {
   ws.onmessage = (ev) => {
     if (typeof ev.data === "string") {
       const m = JSON.parse(ev.data);
-      if (m.type === "ready") { sampleRate = m.sample_rate; log("🔊 Streaming live · " + sampleRate + "Hz"); setDot("live"); playing = true; $("pause").disabled = false; }
+      if (m.type === "ready") { sampleRate = m.sample_rate; everReady = true; reconnectN = 0; log("🔊 Streaming live · " + sampleRate + "Hz"); setDot("live"); playing = true; $("pause").disabled = false; }
       else if (m.type === "perf") { showPerf(m); }
-      else if (m.type === "error") { log("❌ " + m.msg); stop(); }
+      else if (m.type === "error") { log("⚠️ " + m.msg); /* onclose follows -> auto-retry with backoff */ }
       return;
     }
     chunksPlayed++;
     waveIngest(ev.data);
-    const startAt = playChunk(ev.data);
+    playChunk(ev.data);
   };
-  ws.onclose = () => { if (playing) stop(); };
-  ws.onerror = () => { log("❌ stream error"); stop(); };
+  ws.onclose = () => { if (!userStop) scheduleReconnect(); };
+  ws.onerror = () => {};   // onclose handles teardown + retry
+}
+
+// Unexpected drop (tab backgrounded, network/proxy blip, lock not yet freed): the
+// model stays loaded, so silently re-establish the stream with a short backoff.
+function scheduleReconnect() {
+  playing = false;
+  try { if (ctx) ctx.close(); } catch {} ctx = null;
+  try { if (ws) ws.close(); } catch {} ws = null;
+  if (userStop) return;
+  if (++reconnectN > 10) {
+    log("⚠️ stream keeps dropping — press play to retry.");
+    setDot(""); $("play").disabled = false; $("pause").disabled = true; $("perf").textContent = "";
+    reconnectN = 0; return;
+  }
+  setDot("loading");
+  setTimeout(() => { if (!userStop) start(); }, Math.min(4000, 500 * reconnectN));
 }
 
 // Show the adaptive controller's state: how fast it responds and whether it keeps up.
@@ -1056,7 +1077,8 @@ function showPerf(m) {
 }
 
 function stop() {
-  playing = false;
+  userStop = true;          // user-initiated -> do NOT auto-reconnect
+  playing = false; reconnectN = 0;
   if (ws) { try { ws.send(JSON.stringify({ type: "stop" })); } catch {} try { ws.close(); } catch {} ws = null; }
   if (ctx) { try { ctx.close(); } catch {} ctx = null; }
   setDot("");
