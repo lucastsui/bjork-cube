@@ -152,12 +152,17 @@
   .ov-lower { flex:1 1 50%; overflow:auto; min-height:0; }   /* Sampling + PCA share the scrollable bottom half */
   #groovePanel.expanded { position:fixed; left:40px; right:40px; top:64px; bottom:40px; width:auto; max-width:none; max-height:none; flex:none; transform:none; }
   #groovePanel.expanded #grooveFrame { flex:1 1 auto; }
+  /* Groove Cube opens as a full-screen iframe overlay — isolated, can't touch the style cube or stream. */
+  #gcOverlay { position:fixed; inset:0; z-index:50; background:var(--ink-900); display:none; }
+  #gcOverlay.open { display:block; }
+  #gcOverlay iframe { width:100%; height:100%; border:0; display:block; }
+  #gcClose { position:fixed; top:10px; right:14px; z-index:51; }
 </style>
 </head>
 <body>
 <div class="topbar">
   <h1>Björk Cube</h1>
-  <a href="/groovecube" title="Open the Groove Cube instrument (morph grooves over a fixed beat)" style="color:var(--muted);text-decoration:none;font-size:12px;white-space:nowrap">Groove cube ↗</a>
+  <a href="/groovecube" id="gcOpen" title="Open the Groove Cube instrument (morph grooves over a fixed beat)" style="color:var(--muted);text-decoration:none;font-size:12px;white-space:nowrap">Groove cube ↗</a>
   <button id="play" class="tbtn play" title="Play (start continuous stream)" aria-label="Play">
     <svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg>
   </button>
@@ -172,6 +177,13 @@
 </div>
 
 <canvas id="pcaCube"></canvas>
+
+<!-- Groove Cube as an isolated full-screen overlay (iframe). Opening it leaves the
+     main app + stream untouched underneath; closing unloads it (stops its audio). -->
+<div id="gcOverlay">
+  <button id="gcClose" class="mini">✕ close Groove Cube</button>
+  <iframe id="gcFrame" title="Groove Cube"></iframe>
+</div>
 
 <!-- LEFT: Style + Ingredients + Presets + Wander & navigate (one pane) -->
 <div class="ov ov-left">
@@ -1307,6 +1319,17 @@ loadLandmarks();
 $("grooveExpand").addEventListener("click", () => {
   const ex = $("groovePanel").classList.toggle("expanded");
   $("grooveExpand").textContent = ex ? "🗗" : "⤢";
+});
+
+// Groove Cube overlay: open in-app (no navigation) so the style cube + stream stay alive.
+$("gcOpen").addEventListener("click", (e) => {
+  e.preventDefault();
+  $("gcFrame").src = "/groovecube";
+  $("gcOverlay").classList.add("open");
+});
+$("gcClose").addEventListener("click", () => {
+  $("gcOverlay").classList.remove("open");
+  $("gcFrame").src = "";   // unload -> stops the Groove Cube's audio
 });
 </script>
 </body>
