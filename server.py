@@ -754,6 +754,59 @@ async def _resolve_nav(action, inp):
     return None, None
 
 
+DANMAKU_SYSTEM = (
+    "You are a Gen-Z viewer dropping bullet-screen (danmaku) comments while music "
+    "plays. Given a short description of the music's vibe, write {n} VERY short "
+    "reactions — lowercase, slangy, internet/Gen-Z (e.g. 'this slaps fr', 'no cap "
+    "goes hard', 'gothic techno arc 💀🔥', 'caught in 4k vibing', 'it's giving "
+    "main character'). 1-6 words each, emojis ok but sparing, vary them, no @names. "
+    "Return ONLY a JSON array of strings."
+)
+
+_DANMAKU_POOL = [
+    "this slaps fr 🔥", "no cap this goes hard", "{s} arc fr 💀", "ok this is actually fire",
+    "vibing rn ngl", "who made this 😭🔥", "the {s} is sending me", "caught in 4k vibing",
+    "brb adding to playlist", "this hits different", "frfr the bass 🫨", "not me looping this",
+    "10/10 no notes", "goosebumps fr", "{s} supremacy", "it's giving main character",
+    "sheeesh 🔥", "lowkey a banger", "aura +1000", "my roman empire fr", "down bad for this",
+    "the way this slaps 😩", "peak fiction", "ate and left no crumbs",
+]
+
+
+def _danmaku_fallback(style, n):
+    import random
+    s = (style or "this").split(",")[0].strip()[:24] or "this"
+    picks = _DANMAKU_POOL[:]
+    random.shuffle(picks)
+    return [t.replace("{s}", s) for t in picks[:n]]
+
+
+@app.post("/danmaku")
+async def danmaku(request: Request):
+    """Short Gen-Z bullet-screen comments about the current vibe (Claude, with a
+    built-in fallback pool when the API is unavailable)."""
+    data = await request.json()
+    style = (data.get("style") or "electronic music").strip()[:140]
+    n = max(1, min(10, int(data.get("n", 6))))
+    try:
+        client = get_anthropic()
+        msg = await client.messages.create(
+            model="claude-opus-4-8", max_tokens=400,
+            system=DANMAKU_SYSTEM.format(n=n),
+            messages=[{"role": "user", "content": f"The music vibe: {style}"}],
+        )
+        import re
+        text = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", None) == "text")
+        m = re.search(r"\[.*\]", text, re.S)
+        arr = json.loads(m.group(0)) if m else []
+        comments = [str(c).strip()[:60] for c in arr if str(c).strip()][:n]
+        if comments:
+            return {"comments": comments, "source": "claude"}
+    except Exception:  # noqa: BLE001
+        pass
+    return {"comments": _danmaku_fallback(style, n), "source": "fallback"}
+
+
 @app.post("/navigate")
 async def navigate(request: Request):
     """Feeling -> Claude picks an action over the landmark atlas -> target embedding."""

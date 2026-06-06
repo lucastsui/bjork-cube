@@ -157,11 +157,18 @@
   #giPanel { width:min(620px,58vw); }
   #giPad { width:170px; height:148px; background:var(--ink-900); border:1px solid var(--line); border-radius:8px; cursor:crosshair; flex:none; display:block; }
   #giStrip { flex:1; min-width:0; height:148px; display:block; }
+  /* Danmaku (bullet-screen) — Gen-Z comments flowing right→left across the top */
+  #danmaku { position:fixed; left:0; right:0; top:60px; height:44vh; z-index:25; pointer-events:none; overflow:hidden; }
+  .dm-item { position:absolute; white-space:nowrap; font-size:15px; font-weight:500; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.6); will-change:transform; }
+  .topbar .dm-tog { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; white-space:nowrap; cursor:pointer; user-select:none; }
 </style>
 </head>
 <body>
 <div class="topbar">
   <h1>Björk Cube</h1>
+  <label class="dm-tog" title="live Gen-Z comments (danmaku) reacting to the vibe"><input type="checkbox" id="dmToggle"> 💬 comments</label>
+  <input id="dmSay" placeholder="say something…" maxlength="60" title="post your own bullet comment (Enter)" style="width:120px;background:var(--ink-850);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:5px 10px;font:inherit;font-size:12px">
+
   <button id="play" class="tbtn play" title="Play (start continuous stream)" aria-label="Play">
     <svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg>
   </button>
@@ -176,6 +183,7 @@
 </div>
 
 <canvas id="pcaCube"></canvas>
+<div id="danmaku"></div>
 
 
 <!-- Inline Groove instrument: morph grooves over a fixed beat, native (no tab switch). -->
@@ -1432,6 +1440,49 @@ $("grooveExpand").addEventListener("click", () => {
   window.addEventListener('resize',()=>{ if($('giBody').style.display!=='none'){ drawPad(); drawStrip(); } });
 
   load();
+})();
+
+// ---- Danmaku (bullet-screen): LLM Gen-Z comments flow across the top ----------
+(function(){
+  const LANES=7, laneH=30, baseTop=6;
+  const box=()=>$("danmaku");
+  const now=()=> (window.performance && performance.now) ? performance.now() : Date.now();
+  let on=false, queue=[], refillT=null, spawnT=null, laneFree=new Array(LANES).fill(0);
+
+  function styleText(){
+    try{ const t=(inputs||[]).filter(x=>x.type==='text' && (x.text||'').trim()).map(x=>x.text.trim()).join(', ');
+         return t || 'electronic music'; }catch(e){ return 'electronic music'; }
+  }
+  async function refill(){
+    if(!on) return;
+    try{ const r=await fetch('/danmaku',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({style:styleText(),n:8})});
+         const j=await r.json(); if(j && j.comments) queue.push(...j.comments); }catch(e){}
+  }
+  function spawn(text){
+    const c=box(), t=now(); let lane=-1;
+    for(let i=0;i<LANES;i++){ if(t>=laneFree[i]){ lane=i; break; } }
+    if(lane<0) return false;               // every lane busy -> tell caller to requeue
+    const el=document.createElement('div'); el.className='dm-item'; el.textContent=text;
+    el.style.top=(baseTop+lane*laneH)+'px'; c.appendChild(el);
+    const w=el.offsetWidth, cw=c.clientWidth||window.innerWidth;
+    el.style.left=cw+'px';
+    const dur=9000 + Math.min(4000, w*6);  // longer items travel a touch slower
+    laneFree[lane]=t + (w+60)*dur/(cw+w+20);   // free once its tail clears the right edge
+    requestAnimationFrame(()=>{ el.style.transition='transform '+dur+'ms linear'; el.style.transform='translateX('+(-(cw+w+30))+'px)'; });
+    el.addEventListener('transitionend',()=>el.remove());
+    setTimeout(()=>{ if(el.parentNode) el.remove(); }, dur+800);
+    return true;
+  }
+  function drain(){
+    if(!on) return;
+    if(queue.length){ const txt=queue.shift(); if(!spawn(txt)) queue.unshift(txt); }
+    else if(queue.length<2){ refill(); }
+    spawnT=setTimeout(drain, 1300+Math.random()*1500);
+  }
+  function start(){ on=true; refill(); refillT=setInterval(refill, 15000); drain(); }
+  function stop(){ on=false; if(refillT)clearInterval(refillT); if(spawnT)clearTimeout(spawnT); refillT=spawnT=null; queue=[]; box().innerHTML=''; laneFree.fill(0); }
+  $("dmToggle").addEventListener('change', e=>{ e.target.checked ? start() : stop(); });
+  $("dmSay").addEventListener('keydown', e=>{ if(e.key==='Enter'){ const v=e.target.value.trim(); if(v){ if(!spawn(v)) setTimeout(()=>spawn(v),700); e.target.value=''; } } });
 })();
 </script>
 </body>
