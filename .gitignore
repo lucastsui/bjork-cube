@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Runtime scratch
+outputs/
+uploads/
+
+# Large sample audio (users supply their own style clips)
+*.mp3
+
+# Per-user runtime data (personal pins; regenerated at runtime)
+landmarks.json
+
+# Note: groove_dist/ (built Groove map bundle) and vocab.json (embedding cache)
+# ARE committed so the app is runnable straight from a clone.
+
+# Editor backups
+*.bak

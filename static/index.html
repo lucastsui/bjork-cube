@@ -1,0 +1,1314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Björk Cube</title>
+<style>
+  /* ═══ Björk Cube design system — line-art aesthetic ═══ */
+  :root {
+    /* ink scale */
+    --ink-900:#0b0d12; --ink-850:#0d0f14; --ink-800:#0f1115; --ink-700:#181b22; --ink-650:#15171d; --ink-600:#262b35; --ink-500:#3a4150;
+    /* accents */
+    --violet-500:#7c5cff; --violet-300:#c9bcff;
+    --mint-500:#23c08a; --mint-bright:#3ad29a; --mint-300:#a6e8cf;
+    /* text + strokes */
+    --paper:#e7e9ee; --slate-400:#8b93a4; --slate-500:#6b7280;
+    --stroke-bright:#d8dde3; --stroke-dim:#5b6470; --stroke-faint:#353b45;
+    --amber-500:#e0a23c; --coral-500:#e0654c;
+    /* legacy aliases used throughout the markup + JS — remapped to tokens */
+    --bg:var(--ink-800); --panel:var(--ink-700); --line:var(--ink-600);
+    --accent:var(--violet-500);   /* DATA-VIZ only (cube, bars, notes, ingredients) */
+    --accent2:var(--mint-500);    /* the interactive brand accent (on/active/live) */
+    --text:var(--paper); --muted:var(--slate-400);
+    --track:.14em;                /* uppercase control-label tracking */
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:22px 28px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:20px; font-weight:300; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .wrap { max-width:1200px; margin:0 auto; padding:24px 28px 64px; }
+  .cols { display:flex; gap:18px; align-items:flex-start; }
+  .sidebar { flex:2 1 0; min-width:0; }
+  .main { flex:3 1 0; min-width:0; }
+  @media (max-width:760px) { .cols { flex-direction:column; } .sidebar, .main { flex:1 1 auto; } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-bottom:18px; }
+  .panel h2 { margin:0 0 14px; font-size:13px; font-weight:500; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  label { display:block; font-size:13px; margin-bottom:6px; color:var(--muted); }
+  input[type=text], textarea, input[type=file] { width:100%; background:var(--ink-850); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:10px 12px; font:inherit; transition:border-color .15s; }
+  input[type=text]:focus, textarea:focus { outline:none; border-color:var(--accent2); }
+  textarea { resize:vertical; min-height:42px; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  /* ── line-art range sliders: thin track + hollow hairline handle ── */
+  input[type=range] { -webkit-appearance:none; appearance:none; height:18px; background:transparent; cursor:pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height:1px; background:var(--stroke-faint); }
+  input[type=range]::-moz-range-track { height:1px; background:var(--stroke-faint); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:11px; height:11px; margin-top:-5px; border-radius:50%; background:var(--bg); border:1.5px solid var(--stroke-bright); transition:border-color .15s; }
+  input[type=range]:hover::-webkit-slider-thumb { border-color:var(--accent2); }
+  input[type=range]::-moz-range-thumb { width:11px; height:11px; border-radius:50%; background:var(--bg); border:1.5px solid var(--stroke-bright); }
+  input[type=range]:hover::-moz-range-thumb { border-color:var(--accent2); }
+  .slider { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .slider input[type=range] { flex:1; }
+  .slider .val { width:58px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text); font-size:13px; }
+  .slider .lab { width:130px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:var(--track); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .inrow { margin-bottom:12px; }
+  .inrow-top { display:flex; align-items:center; gap:8px; }
+  .inrow-bot { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .inrow-bot .wwrap { width:auto; flex:1; }
+  .inrow select.tsel { background:var(--ink-850); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:9px 6px; font:inherit; }
+  .inmid { flex:1; min-width:0; }
+  .inmid input { width:100%; }
+  .wwrap { display:flex; align-items:center; gap:6px; width:185px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:var(--track); }
+  .wwrap input[type=range] { flex:1; }
+  .wwrap .wv { width:40px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text); letter-spacing:0; }
+  .xbtn { width:32px; height:32px; flex:none; padding:0; font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .fname { font-size:13px; color:var(--text); }
+  .pcard { display:flex; align-items:center; gap:12px; background:var(--ink-850); border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
+  .pcard:hover { border-color:var(--accent2); }
+  .pmini { width:140px; height:46px; background:var(--ink-900); border:1px solid var(--line); border-radius:6px; flex:none; }
+  .plabel { flex:1; min-width:0; font-size:12px; color:var(--text); line-height:1.5; word-break:break-word; }
+  .plabel b { color:var(--accent2); font-variant-numeric:tabular-nums; }
+  .pcacols { display:flex; gap:22px; flex-wrap:wrap; }
+  .pcacol { flex:1; min-width:300px; }
+  .pcacol h2 { margin-top:0; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; }
+  .tab { flex:1; text-align:center; padding:9px; border:1px solid var(--line); border-radius:9px; cursor:pointer; color:var(--muted); user-select:none; font-size:11px; text-transform:uppercase; letter-spacing:var(--track); transition:border-color .15s,color .15s; }
+  .tab.active { border-color:var(--accent2); color:var(--accent2); background:rgba(35,192,138,.10); }
+  .hide { display:none; }
+  .toprow { display:flex; gap:18px; align-items:stretch; flex-wrap:wrap; }
+  .topleft { flex:1; min-width:300px; }
+  .bubbles { min-width:260px; height:200px; position:relative; overflow:hidden; border:1px solid var(--line); border-radius:10px; background:var(--ink-900); margin-bottom:18px; }
+  .bubble { position:absolute; left:0; top:0; white-space:nowrap; padding:5px 11px; border-radius:14px; font-size:12px; cursor:grab; user-select:none; border:1px solid; will-change:transform; touch-action:none; }
+  .bubble.inst { color:var(--violet-300); border-color:rgba(124,92,255,.55); background:rgba(124,92,255,.10); }
+  .bubble.genre { color:var(--mint-300); border-color:rgba(35,192,138,.55); background:rgba(35,192,138,.10); }
+  .bubble.ghost { position:fixed; transform:translate(-50%,-50%); z-index:1000; opacity:.95; cursor:grabbing; box-shadow:0 4px 18px rgba(0,0,0,.5); }
+  .inrow.drop { outline:2px dashed var(--accent2); outline-offset:2px; border-radius:8px; }
+  .inrow.dropno { outline:2px dashed var(--coral-500); outline-offset:2px; border-radius:8px; }
+  #stylePanel.dropnew { outline:2px dashed var(--accent2); outline-offset:3px; }
+  .transport { display:flex; align-items:center; gap:14px; }
+  .tbtn { width:56px; height:56px; flex:none; border-radius:50%; border:1px solid var(--stroke-dim); background:var(--ink-850); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; transition:transform .08s, border-color .15s; }
+  .tbtn:hover:not(:disabled) { transform:scale(1.05); border-color:var(--accent2); }
+  .tbtn svg { width:24px; height:24px; }
+  .tbtn.play svg { fill:var(--accent2); }
+  .tbtn.pause svg { fill:var(--text); }
+  .tbtn:disabled { opacity:.35; cursor:default; }
+  #embChart { width:150px; height:36px; background:var(--ink-900); border:1px solid var(--line); border-radius:6px; display:block; flex:none; }
+  #waveTape { width:22vw; min-width:160px; height:36px; background:var(--ink-900); border:1px solid var(--line); border-radius:6px; display:block; flex:none; }
+  #describeBox, #navBox { flex:1; min-width:0; }
+  .chips { margin-top:10px; font-size:11px; color:var(--muted); line-height:2; }
+  .chip { display:inline-block; background:var(--ink-850); border:1px solid var(--line); border-radius:6px; padding:2px 7px; margin:0 4px 4px 0; font-family:ui-monospace,Menlo,monospace; color:var(--accent2); transition:border-color .15s; }
+  .chip:hover { border-color:var(--accent2); }
+  .chip.bad { color:var(--coral-500); border-color:rgba(224,101,76,.6); background:rgba(224,101,76,.10); }
+  .chip.bad:hover { border-color:var(--coral-500); }
+  .mini { padding:7px 14px; border:1px solid var(--stroke-dim); border-radius:8px; background:var(--ink-850); color:var(--muted); cursor:pointer; font:inherit; font-size:13px; transition:border-color .15s,color .15s; }
+  .mini:hover { color:var(--text); border-color:var(--accent2); }
+  .seq { transition:opacity .15s; }
+  .roll, .drum { display:grid; gap:2px; }
+  .cell { height:13px; background:var(--ink-850); border-radius:2px; cursor:pointer; }
+  .cell.sharp { background:var(--ink-650); }
+  .cell:hover { background:#262d3f; }
+  .roll .cell.on { background:var(--accent); }
+  .drum .cell.on { background:var(--accent2); }
+  .cell.col { box-shadow:inset 0 0 0 2px rgba(35,192,138,.9); }
+  .rlab { font-size:9px; color:var(--muted); display:flex; align-items:center; justify-content:flex-end; padding-right:5px; }
+  .dot { width:11px; height:11px; flex:none; border-radius:50%; background:var(--ink-500); transition:background .2s; }
+  .dot.live { background:var(--accent2); box-shadow:0 0 10px var(--accent2); animation:pulse 1.2s infinite; }
+  .dot.loading { background:var(--amber-500); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+  #log { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--accent2); white-space:pre-wrap; min-height:20px; }
+  audio { width:100%; margin-top:12px; }
+  details summary { cursor:pointer; color:var(--muted); font-size:13px; }
+  a.dl { color:var(--accent2); font-size:13px; }
+
+  /* Full-screen "map" layout: cube fills the screen, controls float at corners. */
+  .topbar { position:fixed; top:0; left:0; right:0; height:56px; z-index:30; display:flex; align-items:center; gap:12px; padding:0 16px; background:rgba(15,17,21,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+  .topbar h1 { font-size:18px; margin:0; white-space:nowrap; font-weight:300; letter-spacing:.01em; }
+  .topbar .tbtn { width:40px; height:40px; }
+  .topbar #log, .topbar #perf { font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:26vw; }
+  .topbar #perf { margin-left:auto; }
+  #pcaCube { position:fixed; top:56px; left:0; width:100vw; height:calc(100vh - 56px); background:var(--ink-900); display:block; z-index:0; touch-action:none; cursor:grab; }
+  #pcaCube:active { cursor:grabbing; }
+  .ov { position:fixed; z-index:10; width:340px; overflow:auto; background:rgba(24,27,34,.93); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
+  .ov h2 { margin:0 0 12px; font-size:13px; font-weight:500; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .ov .sec2 { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .ovhead { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
+  .ovhead .caret { color:var(--muted); font-size:12px; }
+  #seqBody { margin-top:12px; }
+  .ov #bubbles { margin:12px 0 0; width:100%; }
+  .ov-tl { top:64px; left:14px; max-height:calc(50vh - 38px); }
+  .ov-tr { top:64px; right:14px; width:320px; max-height:calc(50vh - 38px); }
+  .ov-bl { bottom:14px; left:14px; max-height:calc(50vh - 22px); }
+  .ov-br { bottom:14px; right:14px; max-height:calc(50vh - 22px); }
+  .ov-bc { bottom:14px; left:50%; transform:translateX(-50%); width:auto; max-width:min(640px,62vw); max-height:calc(50vh - 22px); }
+  .ov-left { top:64px; left:14px; bottom:14px; width:340px; max-height:calc(100vh - 78px); }
+  .ov-right { top:64px; right:14px; bottom:14px; width:340px; max-height:calc(100vh - 78px); display:flex; flex-direction:column; overflow:hidden; }
+  #groovePanel { flex:0 0 50%; display:flex; flex-direction:column; min-height:0; }   /* Groove map = top half of the card */
+  #grooveHead { margin-bottom:10px; flex:none; }
+  #grooveHead .mini { margin-left:auto; }
+  #grooveFrame { width:100%; flex:1 1 auto; min-height:0; border:0; border-radius:8px; background:var(--ink-900); display:block; }
+  .ov-lower { flex:1 1 50%; overflow:auto; min-height:0; }   /* Sampling + PCA share the scrollable bottom half */
+  #groovePanel.expanded { position:fixed; left:40px; right:40px; top:64px; bottom:40px; width:auto; max-width:none; max-height:none; flex:none; transform:none; }
+  #groovePanel.expanded #grooveFrame { flex:1 1 auto; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Björk Cube</h1>
+  <button id="play" class="tbtn play" title="Play (start continuous stream)" aria-label="Play">
+    <svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg>
+  </button>
+  <button id="pause" class="tbtn pause" title="Pause (stop stream)" aria-label="Pause" disabled>
+    <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+  </button>
+  <span id="dot" class="dot"></span>
+  <canvas id="embChart" title="model input · style embedding"></canvas>
+  <canvas id="waveTape" title="model output · live waveform (newest on the right)"></canvas>
+  <span id="log" class="hint"></span>
+  <span id="perf" class="hint"></span>
+</div>
+
+<canvas id="pcaCube"></canvas>
+
+<!-- LEFT: Style + Ingredients + Presets + Wander & navigate (one pane) -->
+<div class="ov ov-left">
+  <div id="stylePanel">
+    <h2>Style — mix prompts &amp; audio</h2>
+    <div id="inputs"></div>
+    <div style="margin-top:4px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button id="addInput" class="mini">+ add input</button>
+      <button id="savePreset" class="mini">★ save preset</button>
+      <button id="luckyBtn" class="mini">I'm feeling lucky</button>
+    </div>
+  </div>
+  <div class="sec2">
+    <h2>Ingredients</h2>
+    <div id="bubbles" class="bubbles" title="Drag a word onto the Style section: onto a prompt to add it there, onto empty space to make a new prompt."></div>
+  </div>
+  <div class="sec2">
+    <h2>Presets</h2>
+    <div id="presets"></div>
+    <div class="hint" id="presetsHint">No saved presets yet — set up your inputs and click ★ save preset.</div>
+  </div>
+  <div class="sec2">
+    <h2>Wander &amp; navigate</h2>
+    <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="drift"> slow drift (wander on its own)</label>
+    <div class="slider" style="margin-bottom:8px"><span class="lab">wander speed</span><input type="range" id="driftSpeed" min="0.2" max="3" step="0.1" value="1"><span class="val" id="driftSpeed_v"></span></div>
+    <div class="row" style="gap:8px; margin-bottom:8px">
+      <input type="text" id="describeBox" placeholder="describe this place… e.g. corporate music but with bass">
+      <button id="pinUp" class="mini" title="save a place you like">👍</button>
+      <button id="pinDown" class="mini" title="mark a place to avoid (repels navigation)">👎</button>
+    </div>
+    <div class="row" style="gap:8px">
+      <input type="text" id="navBox" placeholder="take me somewhere… e.g. heavy metal">
+      <button id="navBtn" class="mini">go →</button>
+    </div>
+    <div class="hint" id="navStatus"></div>
+    <div id="landmarkList" class="chips"></div>
+  </div>
+</div>
+
+<!-- BOTTOM-RIGHT: Sampling + PCA sliders -->
+<!-- RIGHT: Groove map (top) + Sampling & guidance + PCA explorer (one card) -->
+<div class="ov ov-right">
+  <div id="groovePanel">
+    <div class="ovhead" id="grooveHead"><h2 style="margin:0">Groove map</h2><button id="grooveExpand" class="mini" title="expand">⤢</button></div>
+    <iframe id="grooveFrame" src="/groove" title="Morphing Groove Map"></iframe>
+  </div>
+  <div class="ov-lower">
+  <div class="sec2">
+    <h2>Sampling &amp; guidance</h2>
+    <div class="grid2">
+      <div>
+        <div class="slider"><span class="lab">temperature</span><input type="range" id="temperature" min="0.1" max="2.5" step="0.05" value="1.3"><span class="val" id="temperature_v"></span></div>
+        <div class="slider"><span class="lab">top_k</span><input type="range" id="top_k" min="1" max="256" step="1" value="40"><span class="val" id="top_k_v"></span></div>
+      </div>
+      <div>
+        <div class="slider"><span class="lab">cfg · style</span><input type="range" id="cfg_musiccoca" min="-1" max="7" step="0.1" value="3.0"><span class="val" id="cfg_musiccoca_v"></span></div>
+        <div class="slider"><span class="lab">cfg · notes</span><input type="range" id="cfg_notes" min="-1" max="7" step="0.1" value="1.0"><span class="val" id="cfg_notes_v"></span></div>
+        <div class="slider"><span class="lab">cfg · drums</span><input type="range" id="cfg_drums" min="-1" max="6" step="1" value="1"><span class="val" id="cfg_drums_v"></span></div>
+      </div>
+    </div>
+    <div class="hint">CFG = how strictly the model obeys each condition. Higher → more literal, lower → freer.</div>
+  </div>
+  <div class="sec2">
+    <h2>PCA explorer</h2>
+    <div id="pca"></div>
+    <div class="hint" id="pcaHint">Save 2+ presets to explore the space between them.</div>
+  </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const sliders = ["temperature","top_k","cfg_musiccoca","cfg_notes","cfg_drums"];
+sliders.forEach(id => {
+  const el = $(id), out = $(id+"_v");
+  const upd = () => out.textContent = el.value;
+  el.addEventListener("input", upd); upd();
+});
+
+// ---- Dynamic style inputs (weighted mix) ----------------------------------
+let inputs = [], inpId = 0;
+
+function createRow(inp) {
+  const row = document.createElement("div"); row.className = "inrow";
+
+  const sel = document.createElement("select"); sel.className = "tsel";
+  sel.innerHTML = `<option value="text">prompt</option><option value="audio">audio</option>`;
+  sel.value = inp.type;
+
+  const mid = document.createElement("div"); mid.className = "inmid";
+  function renderMid() {
+    mid.innerHTML = "";
+    if (inp.type === "audio") {
+      if (inp.file) {
+        const span = document.createElement("span"); span.className = "fname";
+        span.textContent = "📎 " + inp.file.name;
+        const btn = document.createElement("button"); btn.type = "button"; btn.className = "mini"; btn.textContent = "change";
+        btn.addEventListener("click", () => { inp.file = null; renderMid(); onStyleChange(); });
+        mid.append(span, document.createTextNode(" "), btn);
+      } else {
+        const f = document.createElement("input");
+        f.type = "file"; f.accept = "audio/*,.wav,.flac,.ogg,.mp3,.aiff,.aif";
+        f.addEventListener("change", () => { inp.file = f.files[0] || null; if (inp.file) renderMid(); onStyleChange(); });
+        mid.appendChild(f);
+      }
+    } else {
+      const t = document.createElement("input");
+      t.type = "text"; t.placeholder = "e.g. disco funk with a fat bassline"; t.value = inp.text || "";
+      t.addEventListener("input", () => { inp.text = t.value; onStyleChange(); });
+      mid.appendChild(t);
+    }
+  }
+  renderMid();
+  sel.addEventListener("change", () => { inp.type = sel.value; renderMid(); onStyleChange(); });
+
+  const wWrap = document.createElement("div"); wWrap.className = "wwrap";
+  const wlab = document.createElement("span"); wlab.textContent = "w";
+  const wr = document.createElement("input");
+  wr.type = "range"; wr.min = "0"; wr.max = "2"; wr.step = "0.05"; wr.value = inp.weight;
+  const wv = document.createElement("span"); wv.className = "wv"; wv.textContent = (+inp.weight).toFixed(2);
+  wr.addEventListener("input", () => { inp.weight = +wr.value; wv.textContent = (+wr.value).toFixed(2); onStyleChange(); });
+  wWrap.append(wlab, wr, wv);
+
+  const del = document.createElement("button");
+  del.className = "mini xbtn"; del.textContent = "×"; del.title = "remove input";
+  del.addEventListener("click", () => { inputs = inputs.filter(x => x !== inp); row.remove(); onStyleChange(); });
+
+  const top = document.createElement("div"); top.className = "inrow-top"; top.append(sel, mid);
+  const bot = document.createElement("div"); bot.className = "inrow-bot"; bot.append(wWrap, del);
+  row.append(top, bot);
+  row._inp = inp;   // so dropped word-bubbles can resolve which input they hit
+  return row;
+}
+
+function addInput(type, text, weight, file) {
+  const inp = { id: ++inpId, type: type || "text", text: text || "", file: file || null, weight: weight == null ? 1 : weight };
+  inputs.push(inp);
+  $("inputs").appendChild(createRow(inp));
+  return inp;
+}
+
+// Build the multipart form: a JSON `spec` of inputs + the audio files they reference.
+function buildStyleForm() {
+  const fd = new FormData(), spec = [];
+  inputs.forEach((inp, i) => {
+    if (+inp.weight === 0) return;
+    const base = { weight: +inp.weight, seed: 0, use_mapper: false };
+    if (inp.type === "audio") {
+      if (!inp.file) return;
+      const key = "file" + i; fd.append(key, inp.file);
+      spec.push(Object.assign({ type: "audio", file: key }, base));
+    } else {
+      if (!inp.text.trim()) return;
+      spec.push(Object.assign({ type: "text", text: inp.text.trim() }, base));
+    }
+  });
+  fd.append("spec", JSON.stringify(spec));
+  return { fd, count: spec.length };
+}
+
+$("addInput").addEventListener("click", () => addInput("text", "", 1));
+addInput("text", "warm disco funk, groovy bassline", 1);  // start with one input
+
+// ---- Presets: snapshot the inputs + embedding, restore on click -----------
+let presets = [], presetId = 0;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function drawMini(c, arr) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth || 240, h = c.clientHeight || 46;
+  c.width = w * dpr; c.height = h * dpr;
+  const x = c.getContext("2d"); x.scale(dpr, dpr); x.clearRect(0, 0, w, h);
+  if (!arr || !arr.length) return;
+  const mid = h / 2; let m = 0; for (const v of arr) { const a = Math.abs(v); if (a > m) m = a; } if (m === 0) m = 1;
+  const n = arr.length, bw = w / n;
+  for (let i = 0; i < n; i++) {
+    const v = arr[i], bh = (Math.abs(v) / m) * (mid - 1);
+    x.fillStyle = v >= 0 ? "#7c5cff" : "#23c08a";
+    x.fillRect(i * bw, v >= 0 ? mid - bh : mid, Math.max(bw, 0.5), bh);
+  }
+}
+
+function renderPresets() {
+  const c = $("presets"); c.innerHTML = "";
+  $("presetsHint").style.display = presets.length ? "none" : "";
+  presets.forEach(p => {
+    const card = document.createElement("div"); card.className = "pcard"; card.title = "click to restore";
+    const cv = document.createElement("canvas"); cv.className = "pmini";
+    const label = document.createElement("div"); label.className = "plabel";
+    label.innerHTML = p.items.map(it =>
+      `${esc(it.type === "audio" ? (it.fname || "audio") : (it.text || "(empty)"))} <b>×${(+it.weight).toFixed(2)}</b>`
+    ).join("<br>");
+    const del = document.createElement("button"); del.className = "mini xbtn"; del.textContent = "×"; del.title = "delete preset";
+    del.addEventListener("click", e => { e.stopPropagation(); presets = presets.filter(x => x !== p); renderPresets(); });
+    card.append(cv, label, del);
+    card.addEventListener("click", () => restorePreset(p));
+    c.appendChild(card);
+    drawMini(cv, p.vec);   // draw after attach so clientWidth is known
+  });
+  refreshPCA();            // presets changed -> recompute principal axes
+}
+
+async function savePreset() {
+  const items = inputs
+    .filter(inp => (inp.type === "audio" ? inp.file : inp.text.trim()))
+    .map(inp => ({ type: inp.type, text: inp.text, fname: inp.file ? inp.file.name : "", file: inp.file, weight: inp.weight }));
+  if (!items.length) { log("⚠️ Nothing to save — add a prompt or audio first."); return; }
+  let vec = lastVec;
+  try {
+    const { fd, count } = buildStyleForm();
+    if (count) { const r = await fetch("/embedding", { method: "POST", body: fd }); if (r.ok) vec = (await r.json()).embedding; }
+  } catch (e) {}
+  presets.push({ id: ++presetId, items, vec });
+  renderPresets();
+}
+
+function restorePreset(p) {
+  inputs = []; $("inputs").innerHTML = "";
+  p.items.forEach(it => addInput(it.type, it.text, it.weight, it.file));
+  onStyleChange();   // preview if idle, re-steer the live stream if playing
+}
+
+$("savePreset").addEventListener("click", savePreset);
+
+// ---- "I'm feeling lucky": append random presets built from the vocabulary --
+const LUCKY_MOODS = ["warm", "dreamy", "aggressive", "melancholic", "euphoric", "gritty", "hypnotic", "lush", "minimal", "cinematic", "nostalgic", "spacey", "funky", "dark", "sunny", "ethereal"];
+let _vocabCache = null;
+async function fetchVocab() {
+  if (_vocabCache) return _vocabCache;
+  try { const r = await fetch("/vocab"); if (r.ok) _vocabCache = await r.json(); } catch (e) {}
+  if (!_vocabCache || !_vocabCache.genres) _vocabCache = { instruments: ["piano", "guitar", "synthesizer", "drums"], genres: ["jazz", "techno", "ambient", "rock"] };
+  return _vocabCache;
+}
+const _pick = a => a[Math.floor(Math.random() * a.length)];
+function randomPrompt(v) {
+  const parts = [];
+  if (Math.random() < 0.7) parts.push(_pick(LUCKY_MOODS));
+  parts.push(_pick(v.genres));
+  if (Math.random() < 0.5) parts.push("with " + _pick(v.instruments));
+  return parts.join(" ");
+}
+async function addPresetFromText(text) {
+  const fd = new FormData();
+  fd.append("spec", JSON.stringify([{ type: "text", text, weight: 1, seed: 0, use_mapper: false }]));
+  let vec = null;
+  try { const r = await fetch("/embedding", { method: "POST", body: fd }); if (r.ok) vec = (await r.json()).embedding; } catch (e) {}
+  presets.push({ id: ++presetId, items: [{ type: "text", text, fname: "", file: null, weight: 1 }], vec });
+}
+async function feelingLucky() {
+  const btn = $("luckyBtn"); btn.disabled = true; const label = btn.textContent; btn.textContent = "rolling…";
+  try {
+    const v = await fetchVocab();
+    const n = 3 + Math.floor(Math.random() * 4);   // 3..6 presets
+    for (let i = 0; i < n; i++) await addPresetFromText(randomPrompt(v));
+    renderPresets();
+  } finally { btn.disabled = false; btn.textContent = label; }
+}
+$("luckyBtn").addEventListener("click", feelingLucky);
+
+// ---- PCA explorer: principal axes of the saved presets --------------------
+// For N presets the centered data has rank <= N-1, so we expose N-1 sliders.
+// The model input is reconstructed as  mean + Σ slider_k · component_k.
+let pcaData = null, pcaCoords = [], pcaTimer = null, R = null, cubeView = null;
+
+async function refreshPCA() {
+  pcaPresets = presets.filter(p => p.vec && p.vec.length);
+  const vecs = pcaPresets.map(p => p.vec);
+  if (vecs.length < 2) {
+    pcaData = null; $("pca").innerHTML = ""; drawCube();
+    $("pcaHint").style.display = "";
+    $("pcaHint").textContent = "Save 2+ presets to explore the space between them.";
+    return;
+  }
+  $("pcaHint").style.display = "none";
+  try {
+    const res = await fetch("/pca", { method: "POST", headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ vectors: vecs }) });
+    if (!res.ok) return;
+    pcaData = await res.json();
+    pcaCoords = new Array(pcaData.k).fill(0);
+    computeVocabCoords();
+    computeLandmarkCoords();
+    renderPCA();
+    drawCube();
+  } catch (e) {}
+}
+
+// Dots drawn on the cube (presets + optional vocab + current), for hover/click.
+let cubeDots = [], hoverName = null, hoverXY = null, vocabPoints = null, vocabCoords = null, pcaPresets = [], posTrail = [];
+const CUBE_DIM_MAX = 12;
+let cubeDim = CUBE_DIM_MAX, cubeDimEff = 0;   // how many principal dims the cube shows (slider 1..12, clamped to k)
+let landmarks = [], landmarkCoords = [];      // pins (good/bad) + their PCA coords, for cube dots
+function presetLabel(p) { return ((p.items || []).map(it => it.type === "audio" ? (it.fname || "audio") : (it.text || "(empty)")).join(" + ")) || "preset"; }
+async function ensureVocabPoints() {
+  if (!vocabPoints) { try { const r = await fetch("/vocab_points"); if (r.ok) vocabPoints = (await r.json()).points; } catch (e) {} }
+  computeVocabCoords();
+  return vocabPoints;
+}
+function computeVocabCoords() {
+  if (!vocabPoints || !pcaData || !pcaData.k) { vocabCoords = null; return; }
+  const mean = pcaData.mean, comps = pcaData.components;
+  vocabCoords = vocabPoints.map(vp => {
+    const emb = vp.embedding, out = new Array(pcaData.k);
+    for (let k = 0; k < pcaData.k; k++) { let d = 0; const c = comps[k]; for (let i = 0; i < emb.length; i++) d += c[i] * (emb[i] - mean[i]); out[k] = d; }
+    return out;
+  });
+}
+function computeLandmarkCoords() {
+  if (!landmarks.length || !pcaData || !pcaData.k) { landmarkCoords = []; return; }
+  const mean = pcaData.mean, comps = pcaData.components;
+  landmarkCoords = landmarks.map(lm => {
+    const emb = lm.embedding, out = new Array(pcaData.k);
+    for (let k = 0; k < pcaData.k; k++) { let d = 0; const c = comps[k]; for (let i = 0; i < emb.length; i++) d += c[i] * (emb[i] - mean[i]); out[k] = d; }
+    return out;
+  });
+}
+
+// Map a coordinate vector to normalized cube coords u_j ∈ [-1,1] within each axis range.
+function pcaToU(coord) {
+  const k = cubeDimEff || (pcaData ? pcaData.k : coord.length);   // use only the shown dims
+  const out = [];
+  for (let j = 0; j < k; j++) { const [lo, hi] = pcaData.ranges[j]; out.push(hi > lo ? (2 * (coord[j] - lo) / (hi - lo) - 1) : 0); }
+  return out;
+}
+
+// ---- Rotatable k-D projection ---------------------------------------------
+const _dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+
+// Orthonormal k×k frame; rows 0,1 map to screen x,y. Seeded with the Petrie
+// plane (nice 2k-gon view), completed by Gram-Schmidt.
+function buildR(k) {
+  const a = [], b = [];
+  for (let j = 0; j < k; j++) { a.push(Math.cos(Math.PI * j / k)); b.push(Math.sin(Math.PI * j / k)); }
+  const seeds = [a, b];
+  for (let j = 0; j < k; j++) { const e = new Array(k).fill(0); e[j] = 1; seeds.push(e); }
+  const rows = [];
+  for (const s of seeds) {
+    if (rows.length >= k) break;
+    const v = s.slice();
+    for (const r of rows) { const d = _dot(v, r); for (let i = 0; i < k; i++) v[i] -= d * r[i]; }
+    let n = 0; for (const c of v) n += c * c; n = Math.sqrt(n);
+    if (n < 1e-9) continue;
+    for (let i = 0; i < k; i++) v[i] /= n; rows.push(v);
+  }
+  return rows;
+}
+
+// Rotate rows i,j of the frame by angle (a coordinate-plane rotation).
+function rotatePlane(i, j, ang) {
+  if (!R || i >= R.length || j >= R.length) return;
+  const c = Math.cos(ang), s = Math.sin(ang), ri = R[i], rj = R[j];
+  for (let t = 0; t < ri.length; t++) { const u = ri[t], w = rj[t]; ri[t] = c * u + s * w; rj[t] = -s * u + c * w; }
+}
+
+// Project a k-vector to screen-plane coords (pre-scale) via rows 0,1 of R.
+function projK(cv) {
+  const r0 = R[0], r1 = R[1] || null; let x = 0, y = 0;
+  for (let t = 0; t < cv.length; t++) { x += r0[t] * cv[t]; if (r1) y += r1[t] * cv[t]; }
+  return [x, y];
+}
+
+function drawCube() {
+  const c = $("pcaCube"), x = c.getContext("2d"), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || 360, h = c.clientHeight || 200;
+  c.width = w * dpr; c.height = h * dpr; x.scale(dpr, dpr); x.clearRect(0, 0, w, h);
+  if (!pcaData || !pcaData.k) {
+    cubeView = null; return;
+  }
+  const k = Math.min(Math.max(1, cubeDim), pcaData.k, CUBE_DIM_MAX);   // shown dims (slider 1..12, clamped to k)
+  cubeDimEff = k;
+  if (!R || R.length !== k) { R = buildR(k); posTrail = []; }   // dimension changed -> reset trail
+  const margin = 22, cx = w / 2, cy = h / 2;
+  const ext = Math.max(1, Math.sqrt(k));                 // fixed -> stable size while rotating
+  const scale = Math.min((w / 2 - margin) / ext, (h / 2 - margin) / ext) * cubeZoom;
+  cubeView = { cx, cy, scale };
+  const depthOf = cv => (k >= 3 && R[2]) ? _dot(R[2], cv) : 0;
+  const P = cv => { const [px, py] = projK(cv); return [cx + px * scale, cy - py * scale]; };
+
+  const drawWire = k <= 6;
+  if (drawWire) {
+    for (let vi = 0; vi < (1 << k); vi++) {
+      const u = []; for (let j = 0; j < k; j++) u.push((vi >> j & 1) ? 1 : -1);
+      const p0 = P(u);
+      for (let b = 0; b < k; b++) {
+        const nj = vi ^ (1 << b);
+        if (nj > vi) {
+          const u2 = []; for (let j = 0; j < k; j++) u2.push((nj >> j & 1) ? 1 : -1);
+          const p1 = P(u2);
+          const dep = (depthOf(u) + depthOf(u2)) / 2 / ext;        // -1..1 depth cue
+          const al = (0.22 + 0.4 * (dep + 1) / 2).toFixed(3);
+          x.strokeStyle = `rgba(124,92,255,${al})`; x.lineWidth = 1;
+          x.beginPath(); x.moveTo(p0[0], p0[1]); x.lineTo(p1[0], p1[1]); x.stroke();
+        }
+      }
+    }
+  } else {
+    x.strokeStyle = "rgba(124,92,255,.30)"; x.lineWidth = 1;
+    for (let j = 0; j < k; j++) {
+      const ua = new Array(k).fill(0), ub = new Array(k).fill(0); ua[j] = 1; ub[j] = -1;
+      const a = P(ua), b = P(ub); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
+    }
+  }
+
+  cubeDots = [];
+
+  // --- Trail: record the current position when it moves, draw it fading. ---
+  {
+    const cur = pcaCoords.slice();
+    const last = posTrail.length ? posTrail[posTrail.length - 1] : null;
+    if (!last || cur.some((v, i) => Math.abs(v - last[i]) > 1e-9)) {
+      posTrail.push(cur); if (posTrail.length > 80) posTrail.shift();
+    }
+    for (let i = 1; i < posTrail.length; i++) {
+      if (posTrail[i].length !== k || posTrail[i - 1].length !== k) continue;
+      const a = P(pcaToU(posTrail[i - 1])), b = P(pcaToU(posTrail[i]));
+      const al = (0.5 * (i / posTrail.length)).toFixed(3);   // older = fainter
+      x.strokeStyle = `rgba(35,192,138,${al})`; x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
+    }
+  }
+
+  // Vocabulary anchors (faint) — always shown.
+  if (vocabPoints && vocabCoords && vocabCoords.length === vocabPoints.length) {
+    x.fillStyle = "rgba(150,162,196,.5)";
+    for (let i = 0; i < vocabPoints.length; i++) {
+      const p = P(pcaToU(vocabCoords[i])); x.beginPath(); x.arc(p[0], p[1], 2.4, 0, 7); x.fill();
+      cubeDots.push({ px: p[0], py: p[1], name: vocabPoints[i].word, emb: vocabPoints[i].embedding, kind: "vocab" });
+    }
+  }
+
+  // Preset positions (green).
+  x.fillStyle = "rgba(35,192,138,.85)";
+  (pcaData.coords || []).forEach((coord, i) => {
+    const p = P(pcaToU(coord)); x.beginPath(); x.arc(p[0], p[1], 3.5, 0, 7); x.fill();
+    const pr = pcaPresets[i];
+    if (pr) cubeDots.push({ px: p[0], py: p[1], name: presetLabel(pr), emb: pr.vec, kind: "preset" });
+  });
+
+  // Landmark dots: 👍 good = green, 👎 bad = red (a place navigation avoids).
+  if (landmarks.length && landmarkCoords.length === landmarks.length) {
+    for (let i = 0; i < landmarks.length; i++) {
+      const bad = landmarks[i].polarity === "bad";
+      const p = P(pcaToU(landmarkCoords[i]));
+      x.fillStyle = bad ? "rgba(224,101,76,.95)" : "rgba(35,210,154,.95)";
+      x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill();
+      if (bad) { x.strokeStyle = "rgba(224,101,76,.55)"; x.lineWidth = 1; x.beginPath(); x.arc(p[0], p[1], 7.5, 0, 7); x.stroke(); }
+      cubeDots.push({ px: p[0], py: p[1], name: (bad ? "👎 " : "👍 ") + landmarks[i].description, emb: landmarks[i].embedding, kind: "landmark" });
+    }
+  }
+
+  // Current position (draggable bright dot).
+  const pc = P(pcaToU(pcaCoords));
+  x.fillStyle = "#fff"; x.strokeStyle = "#23c08a"; x.lineWidth = 2;
+  x.beginPath(); x.arc(pc[0], pc[1], 6, 0, 7); x.fill(); x.stroke();
+  cubeDots.push({ px: pc[0], py: pc[1], name: "current", emb: null, kind: "current" });
+
+  x.fillStyle = "#6b7280"; x.font = "11px -apple-system,sans-serif";
+  const cap = `${k}-cube · drag to rotate · hover/click dots · drag ● to move${k >= 4 ? " · shift = 4th dim" : ""}`;
+  x.fillText(cap, Math.max(366, w - x.measureText(cap).width - 14), 18);   // top-right, clear of the left pane
+
+  // Hover label.
+  if (hoverName && hoverXY) {
+    x.font = "12px -apple-system,sans-serif";
+    const tw = x.measureText(hoverName).width;
+    const lx = Math.min(hoverXY[0] + 10, w - tw - 12), ly = Math.max(16, hoverXY[1] - 10);
+    x.fillStyle = "rgba(0,0,0,.78)"; x.fillRect(lx - 5, ly - 13, tw + 10, 19);
+    x.fillStyle = "#fff"; x.fillText(hoverName, lx, ly);
+  }
+}
+
+// ---- Cube interaction: rotate the space, or drag the current point ---------
+let cubeDrag = null, cubeZoom = 1;
+function cubeDown(e) {
+  if (!pcaData || !pcaData.k || !cubeView) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const [dx, dy] = projK(pcaToU(pcaCoords));
+  const sx = cubeView.cx + dx * cubeView.scale, sy = cubeView.cy - dy * cubeView.scale;
+  const onDot = Math.hypot(px - sx, py - sy) < 12;
+  cubeDrag = { mode: onDot ? "dot" : "rot", lastX: e.clientX, lastY: e.clientY, downX: e.clientX, downY: e.clientY, moved: false };
+  e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault();
+}
+function cubeMove(e) {
+  if (!cubeDrag) {
+    // Hover: name the dot under the pointer.
+    if (!cubeView) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    let found = null, best = 11;
+    for (const d of cubeDots) { const dd = Math.hypot(px - d.px, py - d.py); if (dd < best) { best = dd; found = d; } }
+    const name = found ? found.name : null;
+    if (name !== hoverName) {
+      hoverName = name; hoverXY = found ? [found.px, found.py] : null;
+      e.currentTarget.style.cursor = found ? (found.kind === "current" ? "grab" : "pointer") : "grab";
+      drawCube();
+    }
+    return;
+  }
+  const dx = e.clientX - cubeDrag.lastX, dy = e.clientY - cubeDrag.lastY;
+  cubeDrag.lastX = e.clientX; cubeDrag.lastY = e.clientY;
+  if (Math.hypot(e.clientX - cubeDrag.downX, e.clientY - cubeDrag.downY) > 4) cubeDrag.moved = true;
+  const k = cubeDimEff || pcaData.k;
+  if (cubeDrag.mode === "rot") {
+    if (k === 2) { rotatePlane(0, 1, dx * 0.01); }
+    else if (k >= 3) { const dep = (e.shiftKey && k > 3) ? 3 : 2; rotatePlane(0, dep, dx * 0.01); rotatePlane(1, dep, dy * 0.01); }
+    drawCube();
+  } else {
+    // Move the point within the screen plane (depth components stay fixed).
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const Px = (px - cubeView.cx) / cubeView.scale, Py = -(py - cubeView.cy) / cubeView.scale;
+    const U = pcaToU(pcaCoords), r0 = R[0], r1 = R[1] || null;
+    const c0 = _dot(r0, U), c1 = r1 ? _dot(r1, U) : 0;
+    for (let t = 0; t < U.length; t++) U[t] += (Px - c0) * r0[t] + (r1 ? (Py - c1) * r1[t] : 0);
+    for (let t = 0; t < U.length; t++) U[t] = Math.max(-1, Math.min(1, U[t]));
+    for (let j = 0; j < k; j++) { const [lo, hi] = pcaData.ranges[j]; pcaCoords[j] = lo + (U[j] + 1) / 2 * (hi - lo); }
+    syncPcaSliders(); drawCube(); drawBars(pcaVector()); schedulePcaApply();
+  }
+}
+function cubeUp(e) {
+  // A click (no drag) on a preset/vocab dot drifts the current position to it.
+  if (cubeDrag && !cubeDrag.moved && e && e.currentTarget) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    let found = null, best = 11;
+    for (const d of cubeDots) { const dd = Math.hypot(px - d.px, py - d.py); if (dd < best) { best = dd; found = d; } }
+    if (found && found.kind !== "current" && found.emb) {
+      $("navStatus").textContent = "▶ " + found.name;
+      glideToEmbedding(found.emb);
+    }
+  }
+  cubeDrag = null;
+}
+function syncPcaSliders() {
+  $("pca").querySelectorAll('input[type=range]').forEach((r, j) => {
+    if (j < pcaCoords.length) { r.value = pcaCoords[j]; const v = r.nextElementSibling; if (v) v.textContent = (+pcaCoords[j]).toFixed(2); }
+  });
+}
+(function bindCube() {
+  const c = $("pcaCube");
+  c.addEventListener("pointerdown", cubeDown);
+  c.addEventListener("pointermove", cubeMove);
+  c.addEventListener("pointerup", cubeUp);
+  c.addEventListener("pointercancel", cubeUp);
+  // Pinch (trackpad → ctrl+wheel) or scroll over the cube to zoom; double-click resets.
+  c.addEventListener("wheel", e => {
+    e.preventDefault();
+    cubeZoom = Math.max(0.25, Math.min(12, cubeZoom * Math.exp(-e.deltaY * 0.01)));
+    drawCube();
+  }, { passive: false });
+  c.addEventListener("dblclick", () => { cubeZoom = 1; drawCube(); });
+  c.addEventListener("pointerleave", () => { if (hoverName) { hoverName = null; hoverXY = null; drawCube(); } });
+})();
+
+// Built-in vocabulary dots are always shown on the cube — load them once at startup.
+ensureVocabPoints().then(drawCube);
+
+function renderPCA() {
+  const c = $("pca"); c.innerHTML = "";
+  if (!pcaData || !pcaData.k) return;
+  if (pcaData.k >= 2) {   // dimension slider: max = available dims (presets-1), capped at 12
+    const dmax = Math.min(pcaData.k, CUBE_DIM_MAX);
+    const row = document.createElement("div"); row.className = "slider";
+    const lab = document.createElement("span"); lab.className = "lab"; lab.textContent = "cube dims";
+    const r = document.createElement("input"); r.type = "range"; r.min = 1; r.max = dmax; r.step = 1; r.value = Math.min(cubeDim, dmax);
+    const v = document.createElement("span"); v.className = "val"; v.textContent = Math.min(cubeDim, dmax);
+    r.addEventListener("input", () => { cubeDim = +r.value; v.textContent = r.value; drawCube(); });
+    row.append(lab, r, v); c.appendChild(row);
+  }
+  for (let k = 0; k < pcaData.k; k++) {
+    const [lo, hi] = pcaData.ranges[k];
+    const row = document.createElement("div"); row.className = "slider";
+    const lab = document.createElement("span"); lab.className = "lab";
+    lab.textContent = `PC${k + 1} · ${(pcaData.explained[k] * 100).toFixed(0)}%`;
+    const r = document.createElement("input"); r.type = "range";
+    r.min = lo; r.max = hi; r.step = (hi - lo) / 200 || 0.001; r.value = pcaCoords[k];
+    const v = document.createElement("span"); v.className = "val"; v.textContent = (+pcaCoords[k]).toFixed(2);
+    r.addEventListener("input", () => {
+      pcaCoords[k] = +r.value; v.textContent = (+r.value).toFixed(2);
+      drawCube();              // move the dot in the hypercube
+      drawBars(pcaVector());   // instant embedding-chart feedback
+      schedulePcaApply();      // debounced: tokenize + steer the model
+    });
+    row.append(lab, r, v); c.appendChild(row);
+  }
+  const reset = document.createElement("button"); reset.className = "mini"; reset.textContent = "reset to mean";
+  reset.addEventListener("click", () => { pcaCoords.fill(0); renderPCA(); drawCube(); drawBars(pcaVector()); schedulePcaApply(); });
+  c.appendChild(reset);
+}
+
+// Reconstruct the embedding: mean + Σ coord_k · component_k
+function pcaVector() {
+  const r = pcaData.mean.slice();
+  for (let k = 0; k < pcaData.components.length; k++) {
+    const ck = pcaCoords[k]; if (!ck) continue;
+    const comp = pcaData.components[k];
+    for (let i = 0; i < r.length; i++) r[i] += ck * comp[i];
+  }
+  return r;
+}
+
+function schedulePcaApply() { clearTimeout(pcaTimer); pcaTimer = setTimeout(applyPca, 250); }
+
+async function applyPca() {
+  if (!pcaData) return;
+  const r = pcaVector();
+  try {
+    const res = await fetch("/prepare_raw", { method: "POST", headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ embedding: r }) });
+    if (!res.ok) return;
+    const j = await res.json();
+    drawEmbedding(j);   // chart + discrete tokens of the reconstructed embedding
+    if (playing && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "style", token: j.token }));
+  } catch (e) {}
+}
+
+renderPresets();
+
+const log = m => { $("log").textContent = m; };
+const setDot = c => { $("dot").className = "dot" + (c ? " " + c : ""); };
+
+{ const e = $("driftSpeed"), o = $("driftSpeed_v");
+  const u = () => o.textContent = (+e.value).toFixed(1) + "×";
+  e.addEventListener("input", u); u(); }
+
+// ---- Style-embedding bar chart --------------------------------------------
+let lastVec = null;
+function drawBars(arr) {
+  const c = $("embChart"), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || 860, h = c.clientHeight || 150;
+  c.width = w * dpr; c.height = h * dpr;
+  const x = c.getContext("2d"); x.scale(dpr, dpr);
+  x.clearRect(0, 0, w, h);
+  const mid = h / 2;
+  x.strokeStyle = "rgba(255,255,255,.08)";
+  x.beginPath(); x.moveTo(0, mid); x.lineTo(w, mid); x.stroke();
+  if (!arr || !arr.length) {
+    x.fillStyle = "#6b7280"; x.font = "12px -apple-system,sans-serif";
+    x.fillText("press play, or edit the prompt above, to compute the embedding…", 12, mid - 8);
+    return;
+  }
+  lastVec = arr;
+  let m = 0; for (const v of arr) { const a = Math.abs(v); if (a > m) m = a; }
+  if (m === 0) m = 1;
+  const n = arr.length, bw = w / n;
+  for (let i = 0; i < n; i++) {
+    const v = arr[i], bh = (Math.abs(v) / m) * (mid - 4);
+    x.fillStyle = v >= 0 ? "#7c5cff" : "#23c08a";
+    if (v >= 0) x.fillRect(i * bw, mid - bh, Math.max(bw, 0.6), bh);
+    else        x.fillRect(i * bw, mid,      Math.max(bw, 0.6), bh);
+  }
+}
+function drawEmbedding(j) {
+  drawBars(j.embedding);
+}
+window.addEventListener("resize", () => { if (lastVec) drawBars(lastVec); drawCube(); });
+
+// Preview the embedding without streaming (used when not playing).
+async function refreshEmbedding() {
+  const { fd, count } = buildStyleForm();
+  if (!count) { drawBars(null); return; }
+  try {
+    const r = await fetch("/embedding", { method: "POST", body: fd });
+    if (!r.ok) return;
+    drawEmbedding(await r.json());
+  } catch (e) {}
+}
+
+// On any style-affecting change: steer the live stream if playing, else just preview the chart.
+let embTimer = null;
+function onStyleChange() {
+  clearTimeout(embTimer);
+  embTimer = setTimeout(() => { if (playing) restyleLive(); else refreshEmbedding(); }, 300);
+}
+drawBars(null);  // initial placeholder
+
+// ---- Live waveform tape (top bar) -----------------------------------------
+// PCM chunks from the model are reduced to {mn,mx} columns and pushed into a
+// queue. A rAF loop drains the queue at the real-time audio rate, appending
+// columns at the RIGHT and scrolling the whole tape LEFT — one continuous
+// ribbon of the model's output traveling right→left.
+const WAVE_SAMPLES_PER_COL = 400;   // ~120 cols/sec at 48kHz
+const WAVE_COL_PX = 2;              // on-screen width of one column
+let waveQueue = [];                 // pending columns, oldest first
+let waveRing = [];                  // columns currently on screen, oldest first
+let waveAcc = null;                 // partial column carried across chunks
+let waveRAF = null, waveLastT = null, waveColsOwed = 0;
+
+function waveReset() {
+  waveQueue = []; waveRing = []; waveAcc = null;
+  waveLastT = null; waveColsOwed = 0;
+  const c = $("waveTape");
+  if (c) { const x = c.getContext("2d"); x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,c.width,c.height); }
+}
+
+// Reduce one interleaved-stereo PCM chunk to min/max columns; carry the partial
+// column over to the next chunk so column density stays constant across chunks.
+function waveIngest(arrayBuf) {
+  const f32 = new Float32Array(arrayBuf);
+  const frames = f32.length / 2;
+  let a = waveAcc || { n: 0, mn: 1, mx: -1 };
+  for (let i = 0; i < frames; i++) {
+    const m = (f32[2*i] + f32[2*i+1]) * 0.5;   // mono
+    if (m < a.mn) a.mn = m;
+    if (m > a.mx) a.mx = m;
+    if (++a.n >= WAVE_SAMPLES_PER_COL) {
+      waveQueue.push({ mn: a.mn, mx: a.mx });
+      a = { n: 0, mn: 1, mx: -1 };
+    }
+  }
+  waveAcc = a;
+  // Bound latency: if generation races ahead, drop the oldest pending columns.
+  const cap = 8 * (sampleRate / WAVE_SAMPLES_PER_COL);   // ~8s of backlog
+  if (waveQueue.length > cap) waveQueue.splice(0, waveQueue.length - cap);
+  if (waveRAF == null) waveRAF = requestAnimationFrame(waveFrame);
+}
+
+function waveRedraw() {
+  const c = $("waveTape"), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || 200, h = c.clientHeight || 36;
+  if (c.width !== Math.round(w*dpr) || c.height !== Math.round(h*dpr)) { c.width = w*dpr; c.height = h*dpr; }
+  const x = c.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0);
+  x.clearRect(0, 0, w, h);
+  const mid = h / 2;
+  x.strokeStyle = "rgba(255,255,255,.08)";
+  x.beginPath(); x.moveTo(0, mid); x.lineTo(w, mid); x.stroke();
+  const maxCols = Math.ceil(w / WAVE_COL_PX);
+  if (waveRing.length > maxCols) waveRing.splice(0, waveRing.length - maxCols);
+  // Newest column hugs the right edge; older columns extend left.
+  const x0 = w - waveRing.length * WAVE_COL_PX;
+  x.fillStyle = "#7c5cff";
+  for (let i = 0; i < waveRing.length; i++) {
+    const col = waveRing[i];
+    const top = mid - col.mx * (mid - 1);
+    const bot = mid - col.mn * (mid - 1);
+    x.fillRect(x0 + i * WAVE_COL_PX, top, Math.max(WAVE_COL_PX - 0.5, 0.8), Math.max(bot - top, 0.8));
+  }
+}
+
+function waveFrame(t) {
+  if (waveLastT == null) waveLastT = t;
+  const colsPerSec = sampleRate / WAVE_SAMPLES_PER_COL;
+  waveColsOwed += ((t - waveLastT) / 1000) * colsPerSec;
+  waveLastT = t;
+  let n = Math.floor(waveColsOwed);
+  if (n > 0) {
+    waveColsOwed -= n;
+    while (n-- > 0) waveRing.push(waveQueue.length ? waveQueue.shift() : { mn: 0, mx: 0 });
+    waveRedraw();
+  }
+  // Keep animating while playing or while there is still backlog to drain.
+  if (playing || waveQueue.length) waveRAF = requestAnimationFrame(waveFrame);
+  else { waveRAF = null; waveLastT = null; }
+}
+
+// ---- Web Audio streaming playback -----------------------------------------
+let ctx = null, nextTime = 0, sampleRate = 48000;
+let ws = null, playing = false, chunksPlayed = 0;
+
+function paramsMsg() {
+  return {
+    type: "params",
+    temperature: +$("temperature").value,
+    top_k: +$("top_k").value,
+    cfg_musiccoca: +$("cfg_musiccoca").value,
+    cfg_notes: +$("cfg_notes").value,
+    cfg_drums: +$("cfg_drums").value,
+  };
+}
+
+// Build a style on the server and return its token.
+async function prepareStyle() {
+  const { fd, count } = buildStyleForm();
+  if (!count) throw new Error("Add at least one prompt or audio input with non-zero weight.");
+  const res = await fetch("/prepare_style", { method: "POST", body: fd });
+  if (!res.ok) { let e; try { e = (await res.json()).error; } catch { e = res.status; } throw new Error(e); }
+  return await res.json();   // { token, source, embedding, dim, tokens }
+}
+
+function playChunk(arrayBuf) {
+  const f32 = new Float32Array(arrayBuf);   // interleaved stereo
+  const frames = f32.length / 2;
+  const buf = ctx.createBuffer(2, frames, sampleRate);
+  const L = buf.getChannelData(0), R = buf.getChannelData(1);
+  for (let i = 0; i < frames; i++) { L[i] = f32[2*i]; R[i] = f32[2*i+1]; }
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.connect(ctx.destination);
+  // If the schedule fell behind the playhead, the buffer starved -> a gap occurred.
+  let under = false;
+  if (nextTime < ctx.currentTime + 0.02) { under = true; nextTime = ctx.currentTime + 0.05; }
+  const startAt = nextTime;
+  src.start(startAt);
+  nextTime += buf.duration;
+  if (under && playing && chunksPlayed > 1) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "underrun" }));
+    $("perf").textContent = "⚠️ audio gap — buffering more (auto-adjusting)…";
+    $("perf").style.color = "#e0654c";
+  }
+  return startAt;
+}
+
+async function start(seed) {
+  $("play").disabled = true;
+  setDot("loading");
+  log("⏳ Preparing… (first play loads ~9GB of weights — can take a minute)");
+  let sj;
+  if (seed && seed.token) { sj = seed; }   // start from a given style (e.g. a pinned place)
+  else {
+    try { sj = await prepareStyle(); }
+    catch (e) { log("⚠️ " + e.message); $("play").disabled = false; setDot(""); return; }
+  }
+  const token = sj.token;
+  drawEmbedding(sj);
+
+  ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+  await ctx.resume();
+  nextTime = ctx.currentTime;
+  chunksPlayed = 0;
+  waveReset();
+
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/stream`);
+  ws.binaryType = "arraybuffer";
+
+  ws.onopen = () => ws.send(JSON.stringify(Object.assign({ token }, paramsMsg(), { type: "init" })));
+  ws.onmessage = (ev) => {
+    if (typeof ev.data === "string") {
+      const m = JSON.parse(ev.data);
+      if (m.type === "ready") { sampleRate = m.sample_rate; log("🔊 Streaming live · " + sampleRate + "Hz"); setDot("live"); playing = true; $("pause").disabled = false; }
+      else if (m.type === "perf") { showPerf(m); }
+      else if (m.type === "error") { log("❌ " + m.msg); stop(); }
+      return;
+    }
+    chunksPlayed++;
+    waveIngest(ev.data);
+    const startAt = playChunk(ev.data);
+  };
+  ws.onclose = () => { if (playing) stop(); };
+  ws.onerror = () => { log("❌ stream error"); stop(); };
+}
+
+// Show the adaptive controller's state: how fast it responds and whether it keeps up.
+function showPerf(m) {
+  const resp = ((m.target_ms || 0) + (m.chunk_ms || 0)) / 1000;   // ~time for a change to be heard
+  const bad = m.warn || m.rtf >= 1.0;
+  $("perf").textContent =
+    (bad ? "⚠️ can't keep up · " : "🟢 ") +
+    `${m.rtf.toFixed(2)}× realtime · chunk ${(m.chunk_ms/1000).toFixed(2)}s · responds in ~${resp.toFixed(2)}s` +
+    (m.auto ? " · auto-tuned" : " · sequencer rate");
+  $("perf").style.color = bad ? "#e0a23c" : "var(--muted)";
+  if (playing) setDot(bad ? "loading" : "live");
+}
+
+function stop() {
+  playing = false;
+  if (ws) { try { ws.send(JSON.stringify({ type: "stop" })); } catch {} try { ws.close(); } catch {} ws = null; }
+  if (ctx) { try { ctx.close(); } catch {} ctx = null; }
+  setDot("");
+  $("play").disabled = false; $("pause").disabled = true;
+  $("perf").textContent = "";
+  log("⏸ Paused.");
+}
+
+$("play").addEventListener("click", () => start());
+$("pause").addEventListener("click", stop);
+
+// Live steering: push param changes to the running stream.
+sliders.forEach(id => $(id).addEventListener("change", () => {
+  if (playing && ws && ws.readyState === 1 && id !== "seed") ws.send(JSON.stringify(paramsMsg()));
+}));
+
+// Changing the prompt / audio / seed while playing re-embeds the style live.
+async function restyleLive() {
+  if (!(playing && ws && ws.readyState === 1)) return;
+  try {
+    const sj = await prepareStyle();
+    ws.send(JSON.stringify({ type: "style", token: sj.token }));
+    drawEmbedding(sj);
+    log("Style updated live"); setDot("live");
+  } catch (e) { log("⚠️ " + e.message); }
+}
+
+// ---- Floating word bubbles (instruments & genres) -------------------------
+const INSTRUMENTS = ["piano","electric guitar","acoustic guitar","bass guitar","double bass","violin","cello","viola","harp","flute","clarinet","oboe","bassoon","saxophone","trumpet","trombone","tuba","french horn","drum kit","808 drums","hi-hats","congas","bongos","timpani","marimba","xylophone","vibraphone","organ","hammond organ","synthesizer","synth pad","moog bass","rhodes piano","accordion","harmonica","banjo","mandolin","ukulele","sitar","koto","erhu","tabla","djembe","steel drums","kalimba","theremin","bagpipes","fiddle","harpsichord","clavinet","vocoder","choir","string section","brass section"];
+const GENRES = ["jazz","blues","rock","punk","heavy metal","death metal","pop","synthpop","electronic","EDM","house","deep house","techno","trance","dubstep","drum and bass","jungle","ambient","lo-fi","hip hop","trap","R&B","soul","funk","disco","reggae","ska","dub","classical","baroque","orchestral","opera","folk","country","bluegrass","gospel","latin","salsa","bossa nova","samba","flamenco","afrobeat","k-pop","indie","shoegaze","grunge","breakbeat","downtempo","vaporwave","cinematic"];
+const WORDS = [...INSTRUMENTS.map(w => ({ w, kind: "inst" })), ...GENRES.map(w => ({ w, kind: "genre" }))];
+
+(function initBubbles() {
+  const box = $("bubbles"), N = 16, items = [];
+  const pick = () => WORDS[Math.floor(Math.random() * WORDS.length)];
+  function reset(it, below) {
+    const W = box.clientWidth || 320, H = box.clientHeight || 190, p = pick();
+    it.word = p.w; it.el.textContent = p.w; it.el.dataset.word = p.w;
+    it.el.className = "bubble " + (p.kind === "inst" ? "inst" : "genre");
+    it.vy = 14 + Math.random() * 26;
+    it.swayAmp = 5 + Math.random() * 12; it.swayFreq = 0.5 + Math.random() * 1.1; it.phase = Math.random() * 6.28;
+    it.x = Math.random() * Math.max(20, W - 120);
+    it.y = below ? H + Math.random() * H : Math.random() * H;
+  }
+  for (let i = 0; i < N; i++) {
+    const el = document.createElement("div"); el.className = "bubble genre"; box.appendChild(el);
+    const it = { el }; reset(it, false); items.push(it);
+    el.addEventListener("pointerdown", ev => { ev.preventDefault(); startBubbleDrag(el.dataset.word, ev.clientX, ev.clientY); });
+  }
+  let last = performance.now();
+  function tick(t) {
+    const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    const H = box.clientHeight || 190;
+    for (const it of items) {
+      it.phase += dt; it.y -= it.vy * dt;
+      const x = it.x + Math.sin(it.phase * it.swayFreq) * it.swayAmp;
+      it.el.style.transform = `translate(${x}px, ${it.y}px)`;
+      if (it.y < -44) reset(it, true);
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+// ---- Drag a word bubble into the Style section ----------------------------
+function clearDropHL() {
+  document.querySelectorAll(".inrow.drop,.inrow.dropno").forEach(e => e.classList.remove("drop", "dropno"));
+  $("stylePanel").classList.remove("dropnew");
+}
+function dropTargetAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return { type: "none" };
+  const row = el.closest(".inrow");
+  if (row && row._inp) return row._inp.type === "audio" ? { type: "audio", row } : { type: "text", inp: row._inp, row };
+  if (el.closest("#stylePanel")) return { type: "new" };
+  return { type: "none" };
+}
+function startBubbleDrag(word, x, y) {
+  const ghost = document.createElement("div");
+  ghost.className = "bubble ghost"; ghost.textContent = word;
+  ghost.style.pointerEvents = "none";        // so elementFromPoint sees through it
+  ghost.style.left = x + "px"; ghost.style.top = y + "px";
+  document.body.appendChild(ghost);
+  const move = ev => {
+    ghost.style.left = ev.clientX + "px"; ghost.style.top = ev.clientY + "px";
+    clearDropHL();
+    const t = dropTargetAt(ev.clientX, ev.clientY);
+    if (t.type === "text") t.row.classList.add("drop");
+    else if (t.type === "audio") t.row.classList.add("dropno");
+    else if (t.type === "new") $("stylePanel").classList.add("dropnew");
+  };
+  const up = ev => {
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    ghost.remove(); clearDropHL();
+    dropWord(word, ev.clientX, ev.clientY);
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+function dropWord(word, x, y) {
+  const t = dropTargetAt(x, y);
+  if (t.type === "text") {
+    const inp = t.inp;
+    inp.text = inp.text.trim() ? inp.text.trim() + ", " + word : word;
+    const field = t.row.querySelector('input[type=text]'); if (field) field.value = inp.text;
+    onStyleChange();
+  } else if (t.type === "new") {
+    addInput("text", word, 1);
+    onStyleChange();
+  }
+  // audio target or empty area outside the Style section: do nothing
+}
+
+// ---- Wander, pin, and navigate (Claude-driven) ----------------------------
+// Apply a raw 768-d embedding as the live style: cache it, draw it, project it
+// into the cube, and steer the stream if playing.
+async function applyRawEmbedding(vec) {
+  try {
+    const r = await fetch("/prepare_raw", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ embedding: vec }) });
+    if (!r.ok) return;
+    const j = await r.json();
+    drawEmbedding(j);
+    projectToPCA(j.embedding);
+    if (playing && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "style", token: j.token }));
+  } catch (e) {}
+}
+
+// Project a 768-d embedding into PCA coords so the cube dot moves with it.
+function projectToPCA(vec) {
+  if (!pcaData || !pcaData.k) return;
+  const mean = pcaData.mean, comps = pcaData.components;
+  for (let k = 0; k < pcaData.k; k++) {
+    let d = 0; const c = comps[k];
+    for (let i = 0; i < vec.length; i++) d += c[i] * (vec[i] - mean[i]);
+    pcaCoords[k] = d;
+  }
+  syncPcaSliders(); drawCube();
+}
+
+// Pin the current spot with a description -> a landmark saved on disk.
+// polarity "good" (👍) = a place to revisit; "bad" (👎) = a place navigation avoids.
+async function pin(polarity) {
+  const desc = $("describeBox").value.trim();
+  if (!desc) { $("navStatus").textContent = "⚠️ describe the place first"; return; }
+  if (!lastVec) { $("navStatus").textContent = "⚠️ no current position — set a style or press play first"; return; }
+  try {
+    const r = await fetch("/landmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: desc, embedding: lastVec, polarity }) });
+    const j = await r.json();
+    if (!r.ok) { $("navStatus").textContent = "⚠️ " + (j.error || r.status); return; }
+    $("navStatus").textContent = (polarity === "bad" ? "👎 avoiding: " : "👍 pinned: ") + desc;
+    $("describeBox").value = "";
+    loadLandmarks();
+  } catch (e) { $("navStatus").textContent = "⚠️ " + e; }
+}
+$("pinUp").addEventListener("click", () => pin("good"));
+$("pinDown").addEventListener("click", () => pin("bad"));
+$("describeBox").addEventListener("keydown", e => { if (e.key === "Enter") pin("good"); });
+
+// Smoothly travel from the current embedding to the target over a few seconds.
+let glideId = 0, gliding = false;
+const _sleep = ms => new Promise(r => setTimeout(r, ms));
+const _lerp = (a, b, t) => { const o = new Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] + (b[i] - a[i]) * t; return o; };
+function applyNavFinal(j) {
+  drawEmbedding(j); projectToPCA(j.embedding);
+  if (playing && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "style", token: j.token }));
+}
+async function glideTo(j) {
+  const target = j.embedding, start = lastVec ? lastVec.slice() : null;
+  const myId = ++glideId; gliding = true;   // pauses drift while traveling
+  try {
+    if (!start) { applyNavFinal(j); return; }   // no current point -> jump
+    const STEPS = 8;
+    for (let i = 1; i < STEPS; i++) {
+      if (glideId !== myId) return;             // a newer navigate superseded us
+      await applyRawEmbedding(_lerp(start, target, i / STEPS));
+      await _sleep(340);
+    }
+    if (glideId === myId) applyNavFinal(j);      // land exactly on target
+  } finally {
+    if (glideId === myId) gliding = false;
+  }
+}
+
+// Glide to a raw 768-d embedding (e.g. a cube dot clicked).
+async function glideToEmbedding(target) {
+  const start = lastVec ? lastVec.slice() : null;
+  const myId = ++glideId; gliding = true;
+  try {
+    if (!start) { await applyRawEmbedding(target); return; }
+    const STEPS = 8;
+    for (let i = 1; i <= STEPS; i++) {
+      if (glideId !== myId) return;
+      await applyRawEmbedding(_lerp(start, target, i / STEPS));
+      await _sleep(340);
+    }
+  } finally { if (glideId === myId) gliding = false; }
+}
+
+// Navigate by feeling -> Claude picks an action -> glide to the target embedding.
+async function navigate() {
+  const prompt = $("navBox").value.trim();
+  if (!prompt) { $("navStatus").textContent = "⚠️ type where you want to go"; return; }
+  $("navStatus").textContent = "🧭 thinking…";
+  try {
+    const r = await fetch("/navigate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+    const j = await r.json();
+    if (!r.ok) { $("navStatus").textContent = "⚠️ " + (j.error || r.status); return; }
+    $("navStatus").textContent = `🧭 ${j.action} · ${j.reasoning || j.source}`;
+    glideTo(j);                                  // smooth travel (runs in background)
+  } catch (e) { $("navStatus").textContent = "⚠️ " + e; }
+}
+$("navBtn").addEventListener("click", navigate);
+$("navBox").addEventListener("keydown", e => { if (e.key === "Enter") navigate(); });
+
+// Slow autonomous drift: nudge the current embedding with small noise each tick.
+let driftTimer = null, driftVel = null;
+const DRIFT_MS = 450;          // small, frequent steps -> continuous-looking motion
+function gaussian() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+// Damped velocity (Ornstein-Uhlenbeck) walk: momentum makes the path meander
+// smoothly instead of jumping in a fresh random direction each tick.
+function driftTick() {
+  if (!lastVec || gliding) return;
+  const v = lastVec, n = v.length;
+  if (!driftVel || driftVel.length !== n) driftVel = new Array(n).fill(0);
+  let ss = 0; for (const x of v) ss += x * x;
+  const norm = Math.sqrt(ss) || 1, rms = Math.sqrt(ss / n) || 1;
+  const speed = +$("driftSpeed").value || 1;
+  const damp = 0.82;                       // retains 82% of velocity -> smooth turns
+  const impulse = 0.010 * rms * speed;     // small nudge per step
+  const out = new Array(n); let s2 = 0;
+  for (let i = 0; i < n; i++) {
+    driftVel[i] = damp * driftVel[i] + impulse * gaussian();
+    out[i] = v[i] + driftVel[i];
+    s2 += out[i] * out[i];
+  }
+  const scale = norm / (Math.sqrt(s2) || 1);          // keep magnitude steady
+  for (let i = 0; i < n; i++) out[i] *= scale;
+  applyRawEmbedding(out);
+}
+$("drift").addEventListener("change", () => {
+  if ($("drift").checked) { driftVel = null; driftTick(); driftTimer = setInterval(driftTick, DRIFT_MS); }
+  else { clearInterval(driftTimer); driftTimer = null; }
+});
+
+// Click a pinned place to play its embedding: glide there if streaming, else start from it.
+async function gotoLandmark(id, desc) {
+  try {
+    const r = await fetch("/landmark/" + id + "/play", { method: "POST" });
+    const j = await r.json();
+    if (!r.ok) { $("navStatus").textContent = "⚠️ " + (j.error || r.status); return; }
+    $("navStatus").textContent = `▶ ${desc}`;
+    if (playing) glideTo(j); else start(j);
+  } catch (e) { $("navStatus").textContent = "⚠️ " + e; }
+}
+
+// Saved-place chips: 👍 normal / 👎 red. Click to play (audition), × to delete.
+async function loadLandmarks() {
+  try {
+    const r = await fetch("/landmarks"); const j = await r.json();
+    landmarks = j.landmarks || [];
+    computeLandmarkCoords();
+    const el = $("landmarkList"); el.innerHTML = "";
+    landmarks.forEach(lm => {
+      const bad = lm.polarity === "bad";
+      const chip = document.createElement("span"); chip.className = "chip" + (bad ? " bad" : "");
+      chip.style.cursor = "pointer"; chip.title = bad ? "avoid place — click to audition" : "click to play this place";
+      chip.textContent = (bad ? "👎 " : "") + lm.description + " ";
+      chip.addEventListener("click", () => gotoLandmark(lm.id, lm.description));
+      const x = document.createElement("button"); x.className = "mini"; x.textContent = "×";
+      x.style.cssText = "width:18px;height:18px;padding:0;font-size:12px;margin-left:4px;display:inline-flex;align-items:center;justify-content:center;";
+      x.addEventListener("click", async (e) => { e.stopPropagation(); await fetch("/landmark/" + lm.id, { method: "DELETE" }); loadLandmarks(); });
+      chip.appendChild(x); el.appendChild(chip);
+    });
+    drawCube();   // refresh landmark dots on the cube
+  } catch (e) {}
+}
+loadLandmarks();
+
+// Expand/collapse the embedded groove map.
+$("grooveExpand").addEventListener("click", () => {
+  const ex = $("groovePanel").classList.toggle("expanded");
+  $("grooveExpand").textContent = ex ? "🗗" : "⤢";
+});
+</script>
+</body>
+</html>
