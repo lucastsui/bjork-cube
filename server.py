@@ -755,21 +755,21 @@ async def _resolve_nav(action, inp):
 
 
 DANMAKU_SYSTEM = (
-    "You are a Gen-Z viewer dropping bullet-screen (danmaku) comments while music "
-    "plays. Given a short description of the music's vibe, write {n} VERY short "
-    "reactions — lowercase, slangy, internet/Gen-Z (e.g. 'this slaps fr', 'no cap "
-    "goes hard', 'gothic techno arc 💀🔥', 'caught in 4k vibing', 'it's giving "
-    "main character'). 1-6 words each, emojis ok but sparing, vary them, no @names. "
-    "Return ONLY a JSON array of strings."
+    "You are a Gen-Z listener dropping bullet-screen SUGGESTIONS for how to change "
+    "or steer the music. Given a short description of the current vibe, write {n} "
+    "VERY short directions to take it next — what to add/remove or do more/less of "
+    "(e.g. 'add more 808s fr', 'make it darker 💀', 'needs a breakbeat ngl', 'go "
+    "full ambient', 'more reverb pls', 'bpm up fr', 'give it a drop', 'less synth "
+    "more jazz'). 1-6 words each, imperative/suggestive, lowercase, slangy, emojis "
+    "sparing, vary them, no @names. Return ONLY a JSON array of strings."
 )
 
 _DANMAKU_POOL = [
-    "this slaps fr 🔥", "no cap this goes hard", "{s} arc fr 💀", "ok this is actually fire",
-    "vibing rn ngl", "who made this 😭🔥", "the {s} is sending me", "caught in 4k vibing",
-    "brb adding to playlist", "this hits different", "frfr the bass 🫨", "not me looping this",
-    "10/10 no notes", "goosebumps fr", "{s} supremacy", "it's giving main character",
-    "sheeesh 🔥", "lowkey a banger", "aura +1000", "my roman empire fr", "down bad for this",
-    "the way this slaps 😩", "peak fiction", "ate and left no crumbs",
+    "add more 808s fr", "make it darker 💀", "needs a breakbeat ngl", "go full ambient",
+    "more reverb pls", "bpm up fr", "give it a drop", "less {s} more jazz", "heavier drums fr",
+    "add some bass 🫨", "go lo-fi ngl", "needs hi-hats", "more melodic pls", "switch it up fr",
+    "spicier 🌶️", "darker than {s}", "add vocals fr", "make it dreamy", "more groove pls",
+    "go harder 💪", "needs a build-up", "strip it back fr", "add some strings", "slow it down ngl",
 ]
 
 
