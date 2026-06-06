@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Groove Cube</title>
+<style>
+  :root{ --ink-900:#0b0d12; --ink-850:#0d0f14; --ink-800:#0f1115; --ink-700:#181b22; --line:#262b35;
+         --violet:#7c5cff; --mint:#23c08a; --coral:#e0654c; --amber:#e0a23c; --paper:#e7e9ee; --slate:#8b93a4; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font:14px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif; background:var(--ink-800); color:var(--paper); overflow:hidden; }
+  .topbar{ position:fixed; top:0; left:0; right:0; height:52px; z-index:30; display:flex; align-items:center; gap:14px;
+           padding:0 16px; background:rgba(15,17,21,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+  .topbar h1{ font-size:16px; font-weight:300; letter-spacing:.02em; margin:0; white-space:nowrap; }
+  .topbar a.back{ color:var(--slate); text-decoration:none; font-size:12px; }
+  .topbar a.back:hover{ color:var(--mint); }
+  .spacer{ flex:1; }
+  .tbtn{ width:40px; height:40px; flex:none; border-radius:50%; border:1px solid #5b6470; background:var(--ink-850);
+         cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; transition:border-color .15s,transform .08s; }
+  .tbtn:hover:not(:disabled){ border-color:var(--mint); transform:scale(1.05); }
+  .tbtn svg{ width:22px; height:22px; }
+  .tbtn.play svg{ fill:var(--mint); } .tbtn.pause svg{ fill:var(--paper); } .tbtn:disabled{ opacity:.35; cursor:default; }
+  #cube{ position:fixed; top:52px; left:0; width:100vw; height:calc(100vh - 52px); background:var(--ink-900); display:block; z-index:0; touch-action:none; cursor:grab; }
+  #cube:active{ cursor:grabbing; }
+  .panel{ position:fixed; z-index:10; background:rgba(24,27,34,.93); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+          border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
+  .panel h2{ margin:0 0 12px; font-size:12px; font-weight:500; text-transform:uppercase; letter-spacing:.1em; color:var(--slate); }
+  .left{ top:64px; left:14px; width:264px; max-height:calc(100vh - 78px); overflow:auto; }
+  .bottom{ left:50%; bottom:14px; transform:translateX(-50%); width:min(720px,70vw); }
+  .row{ display:flex; align-items:center; gap:10px; }
+  label{ color:var(--slate); font-size:12px; }
+  input[type=number]{ width:64px; background:var(--ink-850); border:1px solid var(--line); color:var(--paper); border-radius:7px; padding:6px 8px; font:inherit; }
+  select{ width:100%; background:var(--ink-850); border:1px solid var(--line); color:var(--paper); border-radius:8px; padding:8px; font:inherit; }
+  .mini{ background:var(--ink-850); border:1px solid var(--line); color:var(--paper); border-radius:8px; padding:7px 10px; font:inherit; cursor:pointer; transition:border-color .15s; }
+  .mini:hover{ border-color:var(--mint); }
+  .glist{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; max-height:230px; overflow:auto; }
+  .gchip{ font-size:11px; color:var(--mint); border:1px solid var(--line); background:var(--ink-850); border-radius:6px; padding:3px 7px; cursor:pointer; font-family:ui-monospace,Menlo,monospace; }
+  .gchip:hover{ border-color:var(--mint); }
+  .hint{ color:var(--slate); font-size:11px; margin-top:8px; line-height:1.5; }
+  #strip{ width:100%; height:96px; display:block; }
+  #status{ color:var(--slate); font-size:11px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Groove Cube</h1>
+  <a class="back" href="/">← Björk Cube</a>
+  <span class="spacer"></span>
+  <button id="play" class="tbtn play" title="Play loop" aria-label="Play"><svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg></button>
+  <button id="pause" class="tbtn pause" title="Stop" aria-label="Stop" disabled><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></button>
+  <label>BPM</label><input type="number" id="bpm" min="50" max="200" step="1" value="96">
+  <span id="status">loading grooves…</span>
+</div>
+
+<canvas id="cube"></canvas>
+
+<div class="panel left">
+  <h2>Baseline beat</h2>
+  <select id="pattern">
+    <option value="0">Boom-bap</option>
+    <option value="1">Four-on-floor</option>
+    <option value="2">16th hats</option>
+  </select>
+  <div class="hint">A fixed drum pattern. The cube morphs each hit's <b>timing</b> and <b>volume</b> — drag the bright dot through the grooves, or click a groove below.</div>
+  <h2 style="margin-top:16px">Grooves <span id="gcount" style="color:var(--slate)"></span></h2>
+  <div class="row" style="gap:8px">
+    <button id="lucky" class="mini">🎲 random feel</button>
+    <button id="meanBtn" class="mini">↺ straight</button>
+  </div>
+  <div id="glist" class="glist"></div>
+</div>
+
+<div class="panel bottom">
+  <h2>Live feel · per-16th (timing ▲late ▼early · bar = volume)</h2>
+  <canvas id="strip" height="96"></canvas>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const SLOTS = 16, VEL_SCALE = 40;     // velocity scaled into PCA so it matters alongside ms timing
+
+// ---- Baseline drum patterns (which instrument fires on each 16th) -----------
+const P = (s) => s.split('').map(c => c !== '.');
+const PATTERNS = [
+  { name:'Boom-bap',      kick:P('x.......x..x....'), snare:P('....x.......x...'), hat:P('x.x.x.x.x.x.x.x.') },
+  { name:'Four-on-floor', kick:P('x...x...x...x...'), snare:P('....x.......x...'), hat:P('..x...x...x...x.') },
+  { name:'16th hats',     kick:P('x.....x.x.......'), snare:P('....x.......x...'), hat:P('xxxxxxxxxxxxxxxx') },
+];
+let patIdx = 0;
+
+// ---- Authored velocity-accent grooves (the library has timing only) --------
+const ZERO = Array(SLOTS).fill(0), FLAT = Array(SLOTS).fill(1);
+function vel(arr){ const v = FLAT.slice(); arr.forEach(([i,x]) => v[i] = x); return v; }
+const AUTHORED = [
+  { name:'★ backbeat punch', timing: ZERO.slice(),
+    velocity: vel([[4,1.3],[12,1.3],[0,1.1],[8,1.0],[2,.6],[6,.6],[10,.6],[14,.6]]) },
+  { name:'★ ghost funk', timing: [0,0,4,0,0,0,4,0,0,0,4,0,0,0,4,0],
+    velocity: vel([[0,1.2],[4,1.2],[8,1.2],[12,1.2],[1,.35],[3,.4],[5,.35],[7,.4],[9,.35],[11,.4],[13,.35],[15,.4]]) },
+  { name:'★ crescendo', timing: ZERO.slice(),
+    velocity: Array.from({length:SLOTS},(_,i)=> 0.5 + i/(SLOTS-1)) },
+];
+
+// ---- Groove corpus ---------------------------------------------------------
+let grooves = [];     // {name, timing[16] ms, velocity[16]}
+let pcaData = null, pcaCoords = [];
+
+function vectorOf(g){ return g.timing.concat(g.velocity.map(v => v * VEL_SCALE)); }   // 32-dim
+
+async function loadGrooves(){
+  let lib = [];
+  try { lib = await (await fetch('/groove_library.json')).json(); } catch(e){}
+  const fromLib = (lib || []).filter(g => g.subdivision === SLOTS && Array.isArray(g.timing) && g.timing.length === SLOTS)
+    .map(g => ({ name: g.name, timing: g.timing.map(Number), velocity: FLAT.slice() }));
+  grooves = AUTHORED.concat(fromLib);
+  $('gcount').textContent = `(${grooves.length})`;
+  const res = await fetch('/pca', { method:'POST', headers:{'Content-Type':'application/json'},
+                                    body: JSON.stringify({ vectors: grooves.map(vectorOf) }) });
+  pcaData = await res.json();
+  pcaData.k = Math.min(pcaData.k, pcaData.components.length);   // /pca reports n-1; real dims = #components
+  pcaCoords = new Array(pcaData.k).fill(0);   // mean = the average groove
+  R = buildR(Math.min(pcaData.k, CUBE_MAX));
+  $('status').textContent = `${grooves.length} grooves · ${pcaData.k}-D groove space`;
+  renderGlist(); drawCube(); drawStrip();
+}
+
+// reconstruct the live (blended) groove from the current cube position
+function grooveVector(){
+  const r = pcaData.mean.slice();
+  for (let k = 0; k < pcaData.components.length; k++){
+    const c = pcaCoords[k]; if (!c) continue;
+    const comp = pcaData.components[k];
+    for (let i = 0; i < r.length; i++) r[i] += c * comp[i];
+  }
+  return r;
+}
+function currentGroove(){
+  const v = grooveVector();
+  return {
+    timing: v.slice(0, SLOTS),
+    velocity: v.slice(SLOTS, 2*SLOTS).map(x => Math.max(0, Math.min(1.6, x / VEL_SCALE))),
+  };
+}
+
+// ---- Rotatable k-D cube projection (same math as Björk Cube) ----------------
+const CUBE_MAX = 8;
+let R = null, cubeView = null, cubeZoom = 1, cubeDots = [], hoverName = null, hoverXY = null;
+const _dot = (a,b) => { let s=0; for (let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; };
+function buildR(k){
+  const a=[], b=[];
+  for (let j=0;j<k;j++){ a.push(Math.cos(Math.PI*j/k)); b.push(Math.sin(Math.PI*j/k)); }
+  const seeds=[a,b]; for (let j=0;j<k;j++){ const e=new Array(k).fill(0); e[j]=1; seeds.push(e); }
+  const rows=[];
+  for (const s of seeds){ if (rows.length>=k) break; const v=s.slice();
+    for (const r of rows){ const d=_dot(v,r); for (let i=0;i<k;i++) v[i]-=d*r[i]; }
+    let n=0; for (const c of v) n+=c*c; n=Math.sqrt(n); if (n<1e-9) continue;
+    for (let i=0;i<k;i++) v[i]/=n; rows.push(v); }
+  return rows;
+}
+function rotatePlane(i,j,ang){ if(!R||i>=R.length||j>=R.length) return; const c=Math.cos(ang),s=Math.sin(ang),ri=R[i],rj=R[j];
+  for (let t=0;t<ri.length;t++){ const u=ri[t],w=rj[t]; ri[t]=c*u+s*w; rj[t]=-s*u+c*w; } }
+function projK(cv){ const r0=R[0],r1=R[1]||null; let x=0,y=0; for (let t=0;t<cv.length;t++){ x+=r0[t]*cv[t]; if(r1) y+=r1[t]*cv[t]; } return [x,y]; }
+function pcaToU(coord){ const k=R.length; const out=[]; for (let j=0;j<k;j++){ const [lo,hi]=pcaData.ranges[j]; out.push(hi>lo ? (2*(coord[j]-lo)/(hi-lo)-1) : 0); } return out; }
+
+function drawCube(){
+  const c=$('cube'), x=c.getContext('2d'), dpr=window.devicePixelRatio||1;
+  const w=c.clientWidth||800, h=c.clientHeight||600;
+  c.width=w*dpr; c.height=h*dpr; x.scale(dpr,dpr); x.clearRect(0,0,w,h);
+  if (!pcaData || !pcaData.k){ return; }
+  const k=Math.min(R.length, pcaData.k);
+  const margin=40, cx=w/2, cy=h/2, ext=Math.max(1,Math.sqrt(k));
+  const scale=Math.min((w/2-margin)/ext,(h/2-margin)/ext)*cubeZoom;
+  cubeView={cx,cy,scale};
+  const P2 = cv => { const [px,py]=projK(cv); return [cx+px*scale, cy-py*scale]; };
+  // wireframe
+  if (k<=6){
+    for (let vi=0; vi<(1<<k); vi++){ const u=[]; for (let j=0;j<k;j++) u.push((vi>>j&1)?1:-1); const p0=P2(u);
+      for (let bI=0;bI<k;bI++){ const nj=vi^(1<<bI); if (nj>vi){ const u2=[]; for (let j=0;j<k;j++) u2.push((nj>>j&1)?1:-1);
+        const p1=P2(u2); x.strokeStyle='rgba(124,92,255,.22)'; x.lineWidth=1; x.beginPath(); x.moveTo(p0[0],p0[1]); x.lineTo(p1[0],p1[1]); x.stroke(); } } }
+  } else {
+    x.strokeStyle='rgba(124,92,255,.28)'; x.lineWidth=1;
+    for (let j=0;j<k;j++){ const a=new Array(k).fill(0),b=new Array(k).fill(0); a[j]=1;b[j]=-1; const pa=P2(a),pb=P2(b); x.beginPath(); x.moveTo(pa[0],pa[1]); x.lineTo(pb[0],pb[1]); x.stroke(); }
+  }
+  // groove dots (authored = mint star, library = slate)
+  cubeDots=[];
+  (pcaData.coords||[]).forEach((coord,i)=>{ const p=P2(pcaToU(coord)); const auth=grooves[i] && grooves[i].name.startsWith('★');
+    x.fillStyle= auth ? 'rgba(35,210,154,.95)' : 'rgba(150,162,196,.65)'; x.beginPath(); x.arc(p[0],p[1], auth?3.6:2.8, 0,7); x.fill();
+    cubeDots.push({px:p[0],py:p[1],name:grooves[i]?grooves[i].name:'',idx:i}); });
+  // current (draggable) position
+  const pc=P2(pcaToU(pcaCoords)); x.fillStyle='#fff'; x.strokeStyle='var(--mint)'; x.strokeStyle='#23c08a'; x.lineWidth=2;
+  x.beginPath(); x.arc(pc[0],pc[1],6,0,7); x.fill(); x.stroke();
+  // caption + hover
+  x.fillStyle='#6b7280'; x.font='11px -apple-system,sans-serif';
+  x.fillText(`${k}-D groove space · drag to rotate · drag ● to morph · click a dot to snap`, 14, 18);
+  if (hoverName && hoverXY){ x.font='12px -apple-system,sans-serif'; const tw=x.measureText(hoverName).width;
+    const lx=Math.min(hoverXY[0]+10,w-tw-12), ly=Math.max(16,hoverXY[1]-10);
+    x.fillStyle='rgba(0,0,0,.78)'; x.fillRect(lx-5,ly-13,tw+10,19); x.fillStyle='#fff'; x.fillText(hoverName,lx,ly); }
+}
+
+// ---- Cube interaction ------------------------------------------------------
+let drag=null;
+function at(e){ const r=e.currentTarget.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+function nearestDot(px,py,rad){ let best=rad,found=null; for (const d of cubeDots){ const dd=Math.hypot(px-d.px,py-d.py); if (dd<best){best=dd;found=d;} } return found; }
+$('cube').addEventListener('pointerdown', e=>{
+  if (!cubeView) return; const [px,py]=at(e);
+  const [dx,dy]=projK(pcaToU(pcaCoords)); const sx=cubeView.cx+dx*cubeView.scale, sy=cubeView.cy-dy*cubeView.scale;
+  const onDot=Math.hypot(px-sx,py-sy)<12;
+  drag={mode:onDot?'pt':'rot', lx:e.clientX, ly:e.clientY, downX:e.clientX, downY:e.clientY, moved:false};
+  e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault();
+});
+$('cube').addEventListener('pointermove', e=>{
+  if (!drag){ if(!cubeView) return; const [px,py]=at(e); const f=nearestDot(px,py,11);
+    const nm=f?f.name:null; if (nm!==hoverName){ hoverName=nm; hoverXY=f?[f.px,f.py]:null; e.currentTarget.style.cursor=f?'pointer':'grab'; drawCube(); } return; }
+  const dx=e.clientX-drag.lx, dy=e.clientY-drag.ly; drag.lx=e.clientX; drag.ly=e.clientY;
+  if (Math.hypot(e.clientX-drag.downX,e.clientY-drag.downY)>4) drag.moved=true;
+  const k=R.length;
+  if (drag.mode==='rot'){ if(k===2) rotatePlane(0,1,dx*0.01); else if(k>=3){ const dep=(e.shiftKey&&k>3)?3:2; rotatePlane(0,dep,dx*0.01); rotatePlane(1,dep,dy*0.01);} drawCube(); }
+  else { const [px,py]=at(e); const Px=(px-cubeView.cx)/cubeView.scale, Py=-(py-cubeView.cy)/cubeView.scale;
+    const U=pcaToU(pcaCoords), r0=R[0], r1=R[1]||null; const c0=_dot(r0,U), c1=r1?_dot(r1,U):0;
+    for (let t=0;t<U.length;t++) U[t]+=(Px-c0)*r0[t]+(r1?(Py-c1)*r1[t]:0);
+    for (let t=0;t<U.length;t++) U[t]=Math.max(-1,Math.min(1,U[t]));
+    for (let j=0;j<k;j++){ const [lo,hi]=pcaData.ranges[j]; pcaCoords[j]=lo+(U[j]+1)/2*(hi-lo); }
+    drawCube(); drawStrip(); }
+});
+function endDrag(e){
+  if (drag && !drag.moved && e){ const [px,py]=at(e); const f=nearestDot(px,py,11);
+    if (f){ snapTo(f.idx); } }
+  drag=null;
+}
+$('cube').addEventListener('pointerup', endDrag);
+$('cube').addEventListener('pointercancel', ()=>{ drag=null; });
+$('cube').addEventListener('wheel', e=>{ e.preventDefault(); cubeZoom=Math.max(0.3,Math.min(8,cubeZoom*Math.exp(-e.deltaY*0.01))); drawCube(); }, {passive:false});
+$('cube').addEventListener('dblclick', ()=>{ cubeZoom=1; drawCube(); });
+window.addEventListener('resize', ()=>{ drawCube(); drawStrip(); });
+
+function snapTo(idx){ pcaCoords = (pcaData.coords[idx]||pcaCoords).slice(); $('status').textContent = grooves[idx].name; drawCube(); drawStrip(); }
+function renderGlist(){ const el=$('glist'); el.innerHTML='';
+  grooves.forEach((g,i)=>{ const b=document.createElement('span'); b.className='gchip'; b.textContent=g.name; b.title='snap to this groove';
+    b.addEventListener('click',()=>snapTo(i)); el.appendChild(b); }); }
+$('lucky').addEventListener('click', ()=>{ for (let k=0;k<pcaData.k;k++){ const [lo,hi]=pcaData.ranges[k]; pcaCoords[k]=lo+Math.random()*(hi-lo)*(k<3?1:0.3); } $('status').textContent='random feel'; drawCube(); drawStrip(); });
+$('meanBtn').addEventListener('click', ()=>{ pcaCoords.fill(0); $('status').textContent='mean (straight) groove'; drawCube(); drawStrip(); });
+
+// ---- Live per-slot strip ---------------------------------------------------
+function drawStrip(){
+  const c=$('strip'), x=c.getContext('2d'), dpr=window.devicePixelRatio||1;
+  const w=c.clientWidth||680, h=c.clientHeight||96; c.width=w*dpr; c.height=h*dpr; x.scale(dpr,dpr); x.clearRect(0,0,w,h);
+  if (!pcaData) return;
+  const g=currentGroove(); const mid=h*0.5, cw=w/SLOTS, maxMs=30;
+  x.strokeStyle='rgba(255,255,255,.08)'; x.beginPath(); x.moveTo(0,mid); x.lineTo(w,mid); x.stroke();
+  for (let i=0;i<SLOTS;i++){
+    const cx0=i*cw+cw/2, vel=Math.max(0,Math.min(1.6,g.vel[i])), t=Math.max(-maxMs,Math.min(maxMs,g.timing[i]));
+    // velocity = faint column height from bottom
+    x.fillStyle='rgba(35,192,138,.18)'; const vh=(h-6)*(vel/1.6); x.fillRect(i*cw+2, h-vh, cw-4, vh);
+    // timing = bipolar bar from center (up=late/violet, down=early/coral)
+    const th=(t/maxMs)*(mid-6); x.fillStyle = t>=0 ? 'rgba(124,92,255,.9)' : 'rgba(224,101,76,.9)';
+    if (t>=0) x.fillRect(i*cw+cw*0.3, mid-th, cw*0.4, th); else x.fillRect(i*cw+cw*0.3, mid, cw*0.4, -th);
+    if (i===playSlot && playing){ x.strokeStyle='rgba(255,255,255,.5)'; x.lineWidth=1; x.strokeRect(i*cw+1,1,cw-2,h-2); }
+    if (PATTERNS[patIdx].kick[i]||PATTERNS[patIdx].snare[i]){ x.fillStyle='rgba(231,233,238,.5)'; x.beginPath(); x.arc(cx0,mid,1.6,0,7); x.fill(); }
+  }
+}
+
+// ---- Web Audio synth drum scheduler ---------------------------------------
+let audio=null, master=null, NOISE=null, playing=false, nextTime=0, playSlot=0, schedSlot=0, timer=null;
+function ensureAudio(){
+  if (audio) return; audio=new (window.AudioContext||window.webkitAudioContext)();
+  master=audio.createGain(); master.gain.value=0.9; master.connect(audio.destination);
+  const n=Math.floor(audio.sampleRate*0.3); NOISE=audio.createBuffer(1,n,audio.sampleRate); const d=NOISE.getChannelData(0);
+  for (let i=0;i<n;i++) d[i]=Math.random()*2-1;
+}
+const g0 = v => Math.max(0.0008, Math.min(1.4, v));
+function kick(t,v){ const o=audio.createOscillator(),g=audio.createGain(); o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(50,t+0.12);
+  g.gain.setValueAtTime(g0(v),t); g.gain.exponentialRampToValueAtTime(0.001,t+0.16); o.connect(g).connect(master); o.start(t); o.stop(t+0.18); }
+function snare(t,v){ const s=audio.createBufferSource(); s.buffer=NOISE; const hp=audio.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1300;
+  const g=audio.createGain(); g.gain.setValueAtTime(g0(v*0.8),t); g.gain.exponentialRampToValueAtTime(0.001,t+0.18); s.connect(hp).connect(g).connect(master); s.start(t); s.stop(t+0.2); }
+function hat(t,v){ const s=audio.createBufferSource(); s.buffer=NOISE; const hp=audio.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=7500;
+  const g=audio.createGain(); g.gain.setValueAtTime(g0(v*0.5),t); g.gain.exponentialRampToValueAtTime(0.001,t+0.045); s.connect(hp).connect(g).connect(master); s.start(t); s.stop(t+0.05); }
+function secPerSlot(){ return (60/(+$('bpm').value||96))/4; }   // a 16th = quarter/4
+function scheduler(){
+  const ahead=0.12;
+  while (nextTime < audio.currentTime + ahead){
+    const g=currentGroove(), i=schedSlot, pat=PATTERNS[patIdx];
+    const when=Math.max(audio.currentTime, nextTime + (g.timing[i]||0)/1000), v=g.vel[i];
+    if (pat.kick[i]) kick(when,v); if (pat.snare[i]) snare(when,v); if (pat.hat[i]) hat(when,v*0.9);
+    const slot=i, at=nextTime; setTimeout(()=>{ playSlot=slot; drawStrip(); }, Math.max(0,(at-audio.currentTime)*1000));
+    nextTime += secPerSlot(); schedSlot=(schedSlot+1)%SLOTS;
+  }
+  timer=setTimeout(scheduler, 25);
+}
+function start(){ ensureAudio(); audio.resume(); playing=true; schedSlot=0; nextTime=audio.currentTime+0.06; scheduler();
+  $('play').disabled=true; $('pause').disabled=false; $('status').textContent='▶ playing'; }
+function stop(){ playing=false; if (timer) clearTimeout(timer); timer=null; $('play').disabled=false; $('pause').disabled=true; $('status').textContent='stopped'; drawStrip(); }
+$('play').addEventListener('click', start);
+$('pause').addEventListener('click', stop);
+$('pattern').addEventListener('change', e=>{ patIdx=+e.target.value; drawStrip(); });
+
+loadGrooves();
+</script>
+</body>
+</html>

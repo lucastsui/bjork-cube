@@ -76,6 +76,12 @@ def index():
     return (HERE / "static" / "index.html").read_text()
 
 
+@app.get("/groovecube", response_class=HTMLResponse)
+def groove_cube_page():
+    """Standalone Groove Cube instrument: morph .stt-style grooves over a fixed beat."""
+    return (HERE / "static" / "groove_cube.html").read_text()
+
+
 @app.get("/status")
 def status():
     return JSONResponse(_model_status)
@@ -562,8 +568,8 @@ async def pca(request: Request):
     Xc = X - mean
     _U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
     n = X.shape[0]
-    k = n - 1                       # number of principal directions
-    comps = Vt[:k]                  # (k, 768) orthonormal directions
+    k = min(n - 1, Vt.shape[0])     # principal directions (can't exceed #dims)
+    comps = Vt[:k]                  # (k, D) orthonormal directions
     coords = Xc @ comps.T          # (n, k) where each preset sits on each axis
 
     ranges = []
