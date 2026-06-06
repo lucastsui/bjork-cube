@@ -487,6 +487,16 @@ async def _embed_mix(form):
     except Exception:  # noqa: BLE001
         tempo_bpm = None
 
+    tw = form.get("tempo_weight")
+    tempo_weight = 1.0
+    try:
+        if tw is not None and str(tw).strip():
+            tempo_weight = float(tw)
+    except Exception:  # noqa: BLE001
+        tempo_weight = 1.0
+    if tempo_weight <= 0:
+        tempo_bpm = None   # weight 0 -> tempo off
+
     if not items and tempo_bpm is None:
         return None, None
 
@@ -513,7 +523,7 @@ async def _embed_mix(form):
             if tempo_bpm is not None:                       # tempo beat at full weight
                 tv = _tempo_vec(mc, tempo_bpm)
                 if tv is not None:
-                    vecs.append(tv); weights.append(1.0); sources.append(f"tempo:{tempo_bpm}bpm")
+                    vecs.append(tv); weights.append(tempo_weight); sources.append(f"tempo:{tempo_bpm}bpm×{tempo_weight:g}")
             if not vecs:
                 return None, None
             V = np.stack(vecs)                              # float64 math avoids overflow

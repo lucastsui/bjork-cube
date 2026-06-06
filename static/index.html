@@ -216,7 +216,8 @@
 
 <!-- LEFT: Style + Ingredients + Presets + Wander & navigate (one pane) -->
 <div class="ov ov-left">
-  <div class="slider" style="margin:2px 0 14px"><span class="lab">tempo (bpm)</span><input type="range" id="tempoBpm" min="50" max="200" step="1" value="120"><span class="val" id="tempoBpm_v"></span></div>
+  <div class="slider" style="margin:2px 0 6px"><span class="lab">tempo (bpm)</span><input type="range" id="tempoBpm" min="50" max="200" step="1" value="120"><span class="val" id="tempoBpm_v"></span></div>
+  <div class="slider" style="margin:0 0 14px"><span class="lab">tempo weight</span><input type="range" id="tempoWeight" min="0" max="1" step="0.05" value="1"><span class="val" id="tempoWeight_v"></span></div>
   <div id="stylePanel">
     <h2>Style — mix prompts &amp; audio</h2>
     <div id="inputs"></div>
@@ -383,12 +384,16 @@ function buildStyleForm() {
   });
   fd.append("spec", JSON.stringify(spec));
   const bpm = $("tempoBpm") ? +$("tempoBpm").value : 0;
-  if (bpm) fd.append("tempo_bpm", bpm);   // always-on tempo beat, mixed full-weight server-side
-  return { fd, count: spec.length + (bpm ? 1 : 0) };
+  const tw = $("tempoWeight") ? +$("tempoWeight").value : 1;
+  if (bpm && tw > 0) { fd.append("tempo_bpm", bpm); fd.append("tempo_weight", tw); }  // tempo beat at chosen weight (0 = off)
+  return { fd, count: spec.length + (bpm && tw > 0 ? 1 : 0) };
 }
-// Tempo slider: show value + re-embed/steer live as it moves.
+// Tempo + weight sliders: show value + re-embed/steer live as they move.
 { const e = $("tempoBpm"), o = $("tempoBpm_v");
   const u = () => o.textContent = e.value + " bpm";
+  e.addEventListener("input", () => { u(); onStyleChange(); }); u(); }
+{ const e = $("tempoWeight"), o = $("tempoWeight_v");
+  const u = () => o.textContent = +e.value === 0 ? "off" : Math.round(e.value * 100) + "%";
   e.addEventListener("input", () => { u(); onStyleChange(); }); u(); }
 
 $("addInput").addEventListener("click", () => addInput("text", "", 1));
@@ -710,6 +715,7 @@ function cubeDown(e) {
   const [dx, dy] = projK(pcaToU(pcaCoords));
   const sx = cubeView.cx + dx * cubeView.scale, sy = cubeView.cy - dy * cubeView.scale;
   const onDot = Math.hypot(px - sx, py - sy) < 12;
+  if (onDot) { glideId++; gliding = false; }   // grabbing the dot overrides any in-progress travel (glide/nav)
   cubeDrag = { mode: onDot ? "dot" : "rot", lastX: e.clientX, lastY: e.clientY, downX: e.clientX, downY: e.clientY, moved: false };
   e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault();
 }
@@ -1329,7 +1335,7 @@ function gaussian() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v)
 // Damped velocity (Ornstein-Uhlenbeck) walk: momentum makes the path meander
 // smoothly instead of jumping in a fresh random direction each tick.
 function driftTick() {
-  if (!lastVec || gliding) return;
+  if (!lastVec || gliding || (cubeDrag && cubeDrag.mode === "dot")) return;   // don't drift while dragging the dot
   const v = lastVec, n = v.length;
   if (!driftVel || driftVel.length !== n) driftVel = new Array(n).fill(0);
   let ss = 0; for (const x of v) ss += x * x;
