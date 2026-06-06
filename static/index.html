@@ -159,7 +159,9 @@
   #giStrip { flex:1; min-width:0; height:148px; display:block; }
   /* Danmaku (bullet-screen) — Gen-Z comments flowing right→left across the top */
   #danmaku { position:fixed; left:0; right:0; top:60px; height:108px; z-index:5; pointer-events:none; overflow:hidden; }   /* z:5 = behind the cards (they occlude comments) */
-  .dm-item { position:absolute; white-space:nowrap; font-size:15px; font-weight:500; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.6); will-change:transform; }
+  @keyframes dmflow { to { transform: translateX(var(--dmdx, -110vw)); } }
+  .dm-item { position:absolute; white-space:nowrap; font-size:15px; font-weight:500; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.6); will-change:transform; pointer-events:auto; cursor:pointer; }
+  .dm-item:hover { animation-play-state:paused; text-decoration:underline; color:var(--violet-300,#c9bcff); }
   .dm-tog { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; white-space:nowrap; cursor:pointer; user-select:none; text-shadow:0 1px 2px rgba(0,0,0,.8); }
   #dmCtl { position:fixed; top:62px; left:354px; z-index:20; display:flex; align-items:center; }
 </style>
@@ -1492,9 +1494,13 @@ $("grooveExpand").addEventListener("click", () => {
     el.style.left=cw+'px';
     const dur=9000 + Math.min(4000, w*6);  // longer items travel a touch slower
     laneFree[lane]=t + (w+60)*dur/(cw+w+20);   // free once its tail clears the right edge
-    requestAnimationFrame(()=>{ el.style.transition='transform '+dur+'ms linear'; el.style.transform='translateX('+(-(cw+w+30))+'px)'; });
-    el.addEventListener('transitionend',()=>el.remove());
-    setTimeout(()=>{ if(el.parentNode) el.remove(); }, dur+800);
+    el.title='click to steer the music this way';
+    el.style.setProperty('--dmdx', (-(cw+w+30))+'px');
+    el.style.animation='dmflow '+dur+'ms linear forwards';   // hover pauses it (CSS) so it's clickable
+    el.addEventListener('animationend',()=>el.remove());
+    // Click a comment -> feed it to the "go →" box and run navigation (LLM steers the music).
+    el.addEventListener('click',()=>{ const nb=$("navBox"); if(nb){ nb.value=el.textContent; const go=$("navBtn"); if(go) go.click(); } el.remove(); });
+    setTimeout(()=>{ if(el.parentNode) el.remove(); }, dur+1500);
     return true;
   }
   function drain(){
