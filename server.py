@@ -414,6 +414,27 @@ CHUNK_MIN, CHUNK_MAX = 12, 75  # adaptive free-run chunk bounds (~0.48s .. 3.0s)
 STYLE_AUDIO_MAX_SEC = 20  # cap audio used for a style embedding (keeps embed fast)
 
 
+_tempo_emb_cache: dict[int, object] = {}   # bpm -> embedding (float64), so a slider sweep is instant
+
+
+def _tempo_vec(mc, bpm):
+    """Embed the clean kick-beat reference file for `bpm` (cached). Called inside
+    _embed_lock with the embedding MusicCoCa `mc`."""
+    if bpm in _tempo_emb_cache:
+        return _tempo_emb_cache[bpm]
+    from magenta_rt import audio
+    p = HERE / "tempo_refs" / f"beat_{bpm}bpm.wav"
+    if not p.exists():
+        return None
+    wav = audio.Waveform.from_file(str(p))
+    maxn = int(STYLE_AUDIO_MAX_SEC * wav.sample_rate)
+    if wav.samples.shape[0] > maxn:
+        wav = audio.Waveform(wav.samples[:maxn], wav.sample_rate)
+    v = np.asarray(mc.embed(wav, True, False, 0), dtype=np.float64).ravel()
+    _tempo_emb_cache[bpm] = v
+    return v
+
+
 async def _embed_mix(form):
     """Embed a list of weighted inputs (text or audio) and blend them.
 
@@ -457,7 +478,16 @@ async def _embed_mix(form):
                 continue
             items.append(("text", text, text, w, seed, use_mapper))
 
-    if not items:
+    # Tempo beat (from the slider): always mixed in at full weight if present.
+    tb = form.get("tempo_bpm")
+    tempo_bpm = None
+    try:
+        if tb is not None and str(tb).strip():
+            tempo_bpm = max(50, min(200, int(float(tb))))
+    except Exception:  # noqa: BLE001
+        tempo_bpm = None
+
+    if not items and tempo_bpm is None:
         return None, None
 
     # Phase 2 (thread): decode audio + run MusicCoCa + blend. Done OFF the event
@@ -480,6 +510,12 @@ async def _embed_mix(form):
                     sources.append(f"text:{payload!r}×{w:g}")
                 vecs.append(np.asarray(emb, dtype=np.float64).ravel())
                 weights.append(w)
+            if tempo_bpm is not None:                       # tempo beat at full weight
+                tv = _tempo_vec(mc, tempo_bpm)
+                if tv is not None:
+                    vecs.append(tv); weights.append(1.0); sources.append(f"tempo:{tempo_bpm}bpm")
+            if not vecs:
+                return None, None
             V = np.stack(vecs)                              # float64 math avoids overflow
             W = np.asarray(weights, dtype=np.float64)
             denom = float(np.abs(W).sum()) or 1.0

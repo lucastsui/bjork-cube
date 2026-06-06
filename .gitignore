@@ -20,3 +20,7 @@ landmarks.json
 
 # Editor backups
 *.bak
+
+# Tempo beat references (133MB, reproducible via tools/make_tempo_beats.py)
+tempo_refs/
+.DS_Store

@@ -216,6 +216,7 @@
 
 <!-- LEFT: Style + Ingredients + Presets + Wander & navigate (one pane) -->
 <div class="ov ov-left">
+  <div class="slider" style="margin:2px 0 14px"><span class="lab">tempo (bpm)</span><input type="range" id="tempoBpm" min="50" max="200" step="1" value="120"><span class="val" id="tempoBpm_v"></span></div>
   <div id="stylePanel">
     <h2>Style — mix prompts &amp; audio</h2>
     <div id="inputs"></div>
@@ -381,8 +382,14 @@ function buildStyleForm() {
     }
   });
   fd.append("spec", JSON.stringify(spec));
-  return { fd, count: spec.length };
+  const bpm = $("tempoBpm") ? +$("tempoBpm").value : 0;
+  if (bpm) fd.append("tempo_bpm", bpm);   // always-on tempo beat, mixed full-weight server-side
+  return { fd, count: spec.length + (bpm ? 1 : 0) };
 }
+// Tempo slider: show value + re-embed/steer live as it moves.
+{ const e = $("tempoBpm"), o = $("tempoBpm_v");
+  const u = () => o.textContent = e.value + " bpm";
+  e.addEventListener("input", () => { u(); onStyleChange(); }); u(); }
 
 $("addInput").addEventListener("click", () => addInput("text", "", 1));
 addInput("text", "gothic techno", 1);  // start with one input
