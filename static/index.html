@@ -1473,7 +1473,7 @@ $("grooveExpand").addEventListener("click", () => {
   const LANES=3, laneH=30, baseTop=6;
   const box=()=>$("danmaku");
   const now=()=> (window.performance && performance.now) ? performance.now() : Date.now();
-  let on=false, queue=[], refillT=null, spawnT=null, laneFree=new Array(LANES).fill(0);
+  let on=false, queue=[], refillT=null, spawnT=null, laneFree=new Array(LANES).fill(0), recent=[];
 
   function styleText(){
     try{ const t=(inputs||[]).filter(x=>x.type==='text' && (x.text||'').trim()).map(x=>x.text.trim()).join(', ');
@@ -1505,8 +1505,15 @@ $("grooveExpand").addEventListener("click", () => {
   }
   function drain(){
     if(!on) return;
-    if(queue.length){ const txt=queue.shift(); if(!spawn(txt)) queue.unshift(txt); }
-    else if(queue.length<2){ refill(); }
+    let tries=0;
+    while(queue.length && tries++ < queue.length){
+      const txt=queue.shift();
+      if(recent.includes(txt.toLowerCase())) continue;        // skip recently-shown -> no repeats
+      if(spawn(txt)){ recent.push(txt.toLowerCase()); if(recent.length>30) recent.shift(); }
+      else queue.unshift(txt);                                 // no free lane -> requeue
+      break;
+    }
+    if(queue.length<3) refill();
     spawnT=setTimeout(drain, 1300+Math.random()*1500);
   }
   function start(){ on=true; refill(); refillT=setInterval(refill, 15000); drain(); }

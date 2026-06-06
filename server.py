@@ -761,8 +761,14 @@ DANMAKU_SYSTEM = (
     "(e.g. 'add more 808s fr', 'make it darker 💀', 'needs a breakbeat ngl', 'go "
     "full ambient', 'more reverb pls', 'bpm up fr', 'give it a drop', 'less synth "
     "more jazz'). 1-6 words each, imperative/suggestive, lowercase, slangy, emojis "
-    "sparing, vary them, no @names. Return ONLY a JSON array of strings."
+    "sparing, no @names. Make them genuinely VARIED — spread across rhythm, bass, "
+    "texture, fx, energy, structure, and genre twists — and do NOT lead with the "
+    "same obvious idea every time. Return ONLY a JSON array of strings."
 )
+
+_DANMAKU_ANGLES = ["the drums/rhythm", "the bassline", "texture & atmosphere",
+                   "fx & processing (reverb/delay/distortion)", "energy & dynamics",
+                   "arrangement & structure", "an unexpected genre twist", "the tempo/groove"]
 
 _DANMAKU_POOL = [
     "add more 808s fr", "make it darker 💀", "needs a breakbeat ngl", "go full ambient",
@@ -789,11 +795,15 @@ async def danmaku(request: Request):
     style = (data.get("style") or "electronic music").strip()[:140]
     n = max(1, min(10, int(data.get("n", 6))))
     try:
+        import random
+        angle = random.choice(_DANMAKU_ANGLES)
         client = get_anthropic()
         msg = await client.messages.create(
             model="claude-opus-4-8", max_tokens=400,
             system=DANMAKU_SYSTEM.format(n=n),
-            messages=[{"role": "user", "content": f"The music vibe: {style}"}],
+            messages=[{"role": "user", "content":
+                       f"The music vibe: {style}. For variety, lean this batch toward {angle}; "
+                       f"avoid clichés and don't start them all the same."}],
         )
         import re
         text = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", None) == "text")
