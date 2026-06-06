@@ -60,6 +60,9 @@
   .inrow select.tsel { background:var(--ink-850); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:9px 6px; font:inherit; }
   .inmid { flex:1; min-width:0; }
   .inmid input { width:100%; }
+  .inmid.dropping { outline:2px dashed var(--accent2); outline-offset:2px; border-radius:8px; }
+  .dropzone { display:block; border:1px dashed var(--line); border-radius:8px; padding:9px 12px; color:var(--muted); font-size:12px; cursor:pointer; text-align:center; transition:border-color .15s,color .15s; }
+  .dropzone:hover { border-color:var(--accent2); color:var(--text); }
   .wwrap { display:flex; align-items:center; gap:6px; width:185px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:var(--track); }
   .wwrap input[type=range] { flex:1; }
   .wwrap .wv { width:40px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text); letter-spacing:0; }
@@ -300,6 +303,15 @@ function createRow(inp) {
   sel.value = inp.type;
 
   const mid = document.createElement("div"); mid.className = "inmid";
+  function setAudioFile(file) {
+    if (!file) return;
+    inp.file = file;
+    if (inp.type !== "audio") { inp.type = "audio"; sel.value = "audio"; }   // dropping a file -> audio
+    renderMid(); onStyleChange();
+  }
+  mid.addEventListener("dragover", e => { if ([...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files")) { e.preventDefault(); mid.classList.add("dropping"); } });
+  mid.addEventListener("dragleave", () => mid.classList.remove("dropping"));
+  mid.addEventListener("drop", e => { e.preventDefault(); mid.classList.remove("dropping"); setAudioFile(e.dataTransfer.files && e.dataTransfer.files[0]); });
   function renderMid() {
     mid.innerHTML = "";
     if (inp.type === "audio") {
@@ -310,10 +322,12 @@ function createRow(inp) {
         btn.addEventListener("click", () => { inp.file = null; renderMid(); onStyleChange(); });
         mid.append(span, document.createTextNode(" "), btn);
       } else {
+        const dz = document.createElement("label"); dz.className = "dropzone";
         const f = document.createElement("input");
-        f.type = "file"; f.accept = "audio/*,.wav,.flac,.ogg,.mp3,.aiff,.aif";
-        f.addEventListener("change", () => { inp.file = f.files[0] || null; if (inp.file) renderMid(); onStyleChange(); });
-        mid.appendChild(f);
+        f.type = "file"; f.accept = "audio/*,.wav,.flac,.ogg,.mp3,.aiff,.aif"; f.style.display = "none";
+        f.addEventListener("change", () => { if (f.files[0]) setAudioFile(f.files[0]); });
+        dz.append(document.createTextNode("⬇ drop an audio file or click to browse"), f);
+        mid.appendChild(dz);
       }
     } else {
       const t = document.createElement("input");
@@ -372,6 +386,10 @@ function buildStyleForm() {
 
 $("addInput").addEventListener("click", () => addInput("text", "", 1));
 addInput("text", "gothic techno", 1);  // start with one input
+// Don't let the browser navigate away when an audio file is dropped outside a dropzone.
+["dragover", "drop"].forEach(ev => document.addEventListener(ev, e => {
+  if ([...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files")) e.preventDefault();
+}));
 
 // ---- Presets: snapshot the inputs + embedding, restore on click -----------
 let presets = [], presetId = 0;
