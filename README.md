@@ -1,92 +1,88 @@
 # Björk Cube — status quo / self-handoff
 
-_Last updated: 2026-06-06. This file is a handoff so a fresh context can pick up fast. It documents the non-obvious stuff (architecture decisions, gotchas, current blockers) on top of what the code shows._
+_Last updated: 2026-06-06. A handoff so a fresh context can resume fast. Documents the non-obvious stuff (architecture, gotchas, current state) on top of what the code shows._
 
 ## What this is
-A **local web app** that drives **Magenta RealTime 2** (MRT2) to generate a **continuous, live-steerable music stream**, wrapped in a full-screen "Google-Maps-style" UI built around a **navigable PCA hypercube of the latent music space**. Originally "MRT2 Demo", renamed **Björk Cube**.
+A **local web app** driving **Magenta RealTime 2** (MRT2, `magenta-rt` MLX, `mrt2_base`, 8-bit) for a **continuous, live-steerable music stream**, presented as a **full-screen navigable PCA hypercube** of the latent style space — plus an **embedded groove toolkit** (the Morphing Groove Map) and several steering layers (tempo, danmaku suggestions, landmarks).
 
-- Folder: `~/Desktop/MRT2_demo/`
-- Backend: `server.py` (FastAPI). Frontend: `static/index.html` (one file: HTML + CSS + vanilla JS, no build step).
-- Model: `magenta-rt` **MLX backend**, `mrt2_base`, 8-bit. Runs locally on the M4 Max.
+- Folder: `~/Desktop/MRT2_demo/`. Backend `server.py` (FastAPI). Frontend `static/index.html` (one file: HTML+CSS+vanilla JS, no build). Standalone Groove Cube page `static/groove_cube.html`.
+- GitHub (public): **github.com/lucastsui/bjork-cube**. Model weights: `~/Documents/Magenta/magenta-rt-v2/` (`checkpoints/mrt2_base.safetensors`, 9.2 GB; the `.mlxfn` is a different format the pip lib can't load).
 
-## Run it
+## Run / deploy
 ```bash
-~/Desktop/MRT2_demo/run.sh          # sources the venv + .env, starts uvicorn on 127.0.0.1:8000
-# open http://127.0.0.1:8000
+~/Desktop/MRT2_demo/run.sh           # sources venv + .env, uvicorn on 127.0.0.1:8000
 ```
-- **venv**: `~/code/playground/.venv` (has `magenta-rt[mlx]`, `fastapi`, `uvicorn`, `anthropic`, `soundfile`, `numpy 2.4.4`).
-- **Manual restart** (what I do every time after a code change — the server runs detached and dies when the shell is reaped):
+- venv: `~/code/playground/.venv` (magenta-rt[mlx], fastapi, uvicorn, anthropic, soundfile, numpy).
+- **Restart after a server change** (I do this constantly):
   ```bash
   pkill -f "uvicorn server:app"; sleep 2
   cd ~/Desktop/MRT2_demo && source ~/code/playground/.venv/bin/activate && set -a && source .env && set +a
   (uvicorn server:app --host 127.0.0.1 --port 8000 >/tmp/mrt2_server.log 2>&1 &)
   ```
-- First **▶ Play** loads ~9 GB of weights into RAM (~a minute); after that it stays warm. `/status` shows `not_loaded` until then.
-- Server log: `/tmp/mrt2_server.log`.
+- Frontend-only edits need **no restart** (served from disk) — just reload. Log: `/tmp/mrt2_server.log`.
+- **Public deploy:** Tailscale Funnel exposes it at **https://tsuis-macbook-pro.tail2214e5.ts.net** (public, NO auth — anyone can use the model + spend Claude credits). Start: `tailscale funnel --bg 8000`; stop: `tailscale funnel --https=443 off`. Funnel config persists across reboot; **uvicorn does not** (rerun run.sh). Mac must stay awake.
 
-## Model weights
-- Live at `~/Documents/Magenta/magenta-rt-v2/` (found via the `MAGENTA_HOME` default — no config needed).
-- The pip lib loads `checkpoints/mrt2_base.safetensors` (**9.2 GB fp32**), downloaded from HF `google/magenta-realtime-2`. The bundled MRT2 apps' `mrt2_base.mlxfn` is a *different* (quantized) format the pip lib can't load — don't point at it.
-- MusicCoCa (text/audio→768 embedding) + SpectroStream (audio codec) resources are in the same tree.
+## Current state / blockers
+- **Anthropic API credits are LIVE** (as of 2026-06-06) — `/navigate` ("go →") and `/danmaku` both call Claude (`claude-opus-4-8`) for real. (Earlier the account was at $0; that's resolved.)
+- **Single stream at a time** (`_gen_lock`): a second `/stream` gets "Another stream is active." Testing from a script is blocked while the browser holds it.
 
-## Backend architecture (server.py) — the load-bearing decisions
-- **Lazy model load**: `get_model()` builds `MagentaRT2System(size="mrt2_base", bits=8)` once on first use.
-- **TWO MusicCoCa instances**: the generator's internal `mrt._style_model` AND a separate `_embed_mc` (`get_embed_mc()`) for the HTTP embedding endpoints. **Why**: `generate()` calls `_style_model.tokenize()` every step; sharing one tflite model across the gen thread + an embed thread corrupts it and silently drops the stream. Keep them separate.
-- **Dedicated single-thread executors**: `_gen_executor` for generation, `_embed_executor` for embedding. **Why**: MLX streams are thread-local — running generation on the default thread pool throws `RuntimeError: no Stream(gpu) in current thread`. All generate() calls must stay on the one gen thread.
-- **`_gen_lock`**: only one `/stream` at a time (the browser holds it; a second connection gets "Another stream is active"). When testing from a script, the user's open tab will block you — that's expected, don't fight it.
-- **Streaming** (`/stream` WebSocket): loops `generate()`, chains `state`, sends raw float32 stereo PCM. **Adaptive controller**: sizes the free-run chunk + buffer lead from measured generation time, self-paces so latency doesn't grow, and emits `perf` (RTF) + warns when it can't keep up. Live control messages: `{type:"params"|"style"|"seq"|"underrun"|"stop"}`.
-- **Audio style cap**: `STYLE_AUDIO_MAX_SEC = 20` — only the first 20 s of an uploaded clip is embedded (keeps embedding fast; a long clip otherwise starves generation).
-- **Persisted on disk**: `landmarks.json` (user "pins": description + 768-d embedding), `vocab.json` (104 instrument/genre embeddings).
+## Backend (server.py) — load-bearing decisions
+- **Lazy model load**: `get_model()` builds `MagentaRT2System(size="mrt2_base", bits=8)` once; loaded off the event loop inside the stream's try/finally.
+- **TWO MusicCoCa instances**: generator's internal `mrt._style_model` + a separate `_embed_mc` (`get_embed_mc()`) for HTTP embedding. Sharing one tflite across the gen thread + an embed thread corrupts it and drops the stream. Keep separate.
+- **Dedicated single-thread executors**: `_gen_executor` (generation) + `_embed_executor` (embedding). MLX streams are thread-local → generation MUST stay on one thread (else "no Stream(gpu) in current thread").
+- **Stream lock never leaks**: model load + setup are INSIDE the try whose `finally` releases `_gen_lock` (a past bug leaked it and wedged all future streams → UI showed "Paused"; fixed).
+- **Adaptive streaming** (`/stream`): loops generate(), chains state, sends float32 stereo PCM; sizes chunk + buffer lead from measured gen time; emits `perf`. Live control msgs: `params|style|seq|underrun|stop`.
+- **STYLE_AUDIO_MAX_SEC=20**: only first 20 s of an uploaded clip is embedded.
+- **`/pca` clamps `k = min(n-1, dims)`** (a bug crashed it when #vectors > dims, e.g. 38 grooves × 32 dims).
+- **Persisted:** `landmarks.json` (pins: description + 768-d embedding + `polarity` good/bad; gitignored), `vocab.json` (104 instrument/genre embeddings; committed).
 
 ### Endpoints
 | Endpoint | Purpose |
 |---|---|
-| `GET /`, `GET /status` | page, model state |
-| `POST /prepare_style` | weighted mix of text/audio inputs → cached style `token` (+ embedding) |
-| `POST /embedding` | same mix, preview only (no caching) |
-| `POST /prepare_raw` | a raw 768-d vector → cached `token` (used by PCA sliders, drift, dot-clicks) |
-| `POST /pca` | PCA of the preset vectors → `{mean, components, ranges, coords, explained, k}` (k = N−1) |
-| `GET/POST/DELETE /landmark…`, `POST /landmark/{id}/play` | pins CRUD + play a pin |
-| `POST /navigate` | feeling → **Claude** strict tool use → target embedding |
-| `GET /vocab`, `GET /vocab_points` | vocab words; words+embeddings for cube dots |
-| `WS /stream` | the live audio stream |
-| `POST /generate` | one-shot fixed-length clip (legacy, still works) |
+| `GET /`, `GET /groovecube`, `GET /status` | main page, standalone Groove Cube, model state |
+| `POST /prepare_style`, `POST /embedding` | weighted mix of text/audio inputs → token / preview. **Accept `tempo_bpm` + `tempo_weight`**: server loads `tempo_refs/beat_<bpm>bpm.wav`, embeds (cached), mixes at that weight (0 = off). |
+| `POST /prepare_raw`, `POST /pca` | raw 768-d → token; PCA of vectors |
+| `GET/POST/DELETE /landmark…`, `POST /landmark/{id}/play` | pins CRUD (POST takes `polarity`) |
+| `POST /navigate` | feeling → Claude tool-use → target embedding; **soft-repels away from 👎 (bad) landmarks** (`_repel_from_bad`) |
+| `POST /danmaku` | short Gen-Z **suggestions** to steer the music (Claude + per-call angle for variety; built-in fallback pool) |
+| `GET /vocab`, `GET /vocab_points`, `GET /agr_list` | vocab words/embeddings; list of `agr/` files |
+| `WS /stream` | live audio (client auto-reconnects on drop) |
+| mounts: `/assets` (groove_dist), `/agr` (agr/), `/static`; routes serve `/groove` + 5 root files (straight_drums.wav, amen.wav, demoSongA/B.wav, groove_library.json) | |
 
-## Claude navigation (the "small LLM" layer)
-- `POST /navigate`: sends the user's request + their landmark descriptions + the vocab word list to **`claude-opus-4-8`** (anthropic `AsyncAnthropic`), **strict tool use**, must call exactly one of:
-  `go_to_landmark` · `blend_landmarks` · `compose_from_vocab` · `rewrite_to_music`. The server resolves the choice to a 768-d target embedding (Claude never emits coordinates).
-- **API key** is in `.env` (`ANTHROPIC_API_KEY=…`, chmod 600, gitignored), sourced by `run.sh`.
-- ⚠️ **CURRENT BLOCKER**: the key is valid but the **Anthropic account has $0 API credits**, so `/navigate` returns `400 "Your credit balance is too low…"`. Everything else works. The error is surfaced verbatim in the UI status line. Once credits are added, `go →` works with no code change. (Note: a Claude.ai/Code subscription ≠ API credits.)
-
-## Frontend (static/index.html) — full-screen "map" layout
-- **Top bar**: "Björk Cube" + ▶/⏸ + status **dot** + the embedding **wave chart** (`#embChart`, lives here now) + log/perf.
-- **Full-screen hypercube** (`#pcaCube`) is the base layer: **drag empty space = rotate** (Shift-drag = 4th dim), **pinch/scroll = zoom**, **double-click = reset zoom**, **drag the bright dot = move the current position**, **hover any dot = its name**, **click a preset/vocab dot = glide there**. Only appears with **≥2 presets** (PCA needs them).
-- **Corner overlay cards** (translucent, always visible):
-  - **top-left — Style**: list of inputs, each stacked two lines — `[prompt/audio ▾] [input]` then `[weight ──○──] [×]`. Buttons: `+ add input`, `★ save preset`, `I'm feeling lucky` (appends 3–6 random presets from mood+genre+instrument).
-  - **bottom-left — Ingredients / Presets / Wander & navigate**: "Ingredients" = the floating instrument/genre **word bubbles** (drag onto a prompt to append it, onto empty Style space to make a new prompt, onto an audio input = nothing). Presets = saved snapshots (cards w/ mini chart; click is NOT wired — pins are the clickable thing). Wander = `slow drift` toggle, `wander speed` slider, `show vocabulary on cube` toggle, `📍 pin` (describe current spot → landmark), `go →` (Claude navigate), landmark chips (**click to play**, × to delete).
-  - **bottom-right — Sampling & guidance** (temperature, top_k, cfg·style/notes/drums) + **PCA explorer** sliders (one per principal axis).
-  - **bottom-center — Step sequencer** (notes/drums grid): **collapsible, default collapsed**; header arrow shows the next action (▼ = will expand, ▲ = will collapse).
-- **Travel**: navigation and dot-clicks **glide** (~3 s, 8 steps) to the target; `slow drift` autonomously wanders (scaled by the wander-speed slider).
-- **Layout note**: columns are gone — it's `position:fixed` overlays over a full-screen canvas. Top/bottom cards are capped to half the screen height per side so they don't overlap vertically. On short windows the bottom-center card can overlap the bottom corners (mitigated by collapsing the sequencer).
-
-## Verification habits
-- JS: extract `<script>` and `node --check`. Server: `python -c "import ast; ast.parse(open('server.py').read())"`.
-- Endpoints: `curl` them. Live stream / pin-play / etc. can't be tested while the browser holds `_gen_lock`.
+## Frontend (static/index.html) — full-screen layout
+- **Top bar:** "Björk Cube" + **"comments"** toggle (danmaku) + ▶/⏸ + status dot + `embChart` (style-embedding wave) + `waveTape` (live output wave) + log/perf.
+- **Full-screen hypercube** (`#pcaCube`, base layer): drag empty = rotate (Shift = 4th dim), pinch/scroll = zoom, dblclick = reset, **drag the bright dot = move current position**, hover dots = names, **click a preset/vocab/landmark dot = glide there**. A fading **trail** marks travel. **Cube-dims slider** (PCA card) shows 1..min(presets−1, 12) dims. Needs ≥2 presets to appear.
+  - **Grabbing the current dot cancels any in-progress glide/nav and pauses drift** (press-drag overrides travel).
+- **Left pane** (`ov-left`, flush to top bar + left/bottom edges): **tempo (bpm)** slider + **tempo weight** slider (0 = off) → mixes a kick-beat ref as an audio prompt; **Style** (mix prompts/audio, each row two-line [type][input]/[weight][×]; audio rows are **drag-and-drop** dropzones); **Ingredients** (draggable word bubbles → Style); **Presets** (save/restore + "I'm feeling lucky"); **Wander & navigate** (drift toggle, **travel speed** slider [scales drift AND glides], **👍/👎 pin** [good/bad landmarks], "go →" Claude nav, landmark chips — 👎 shown red, click to play).
+- **Right pane** (`ov-right`, flush right): top half = **Groove map** (iframe `/groove`, the embedded Morphing Groove Map, ⤢ expandable); bottom (scroll) = **Sampling & guidance** (temp/top_k/cfg) + **PCA explorer** (cube-dims + per-PC sliders).
+- **Bottom-center:** **Groove instrument** panel (collapsible). A 2D **morph pad** (groove-library PCA, top-2 PCs) + a synth **drum loop** (play/BPM/pattern) + a **live per-16th strip** (violet=late, coral=early, green=velocity, playhead) + groove-library chips + **`.agr` presets** (click → parse the Ableton `.agr` client-side [DecompressionStream+DOMParser], fold to 16 slots, set the bars as an override). All in an **IIFE with its own AudioContext** — isolated from the MRT2 stream.
+- **Danmaku** overlay: top, **3 rows**, **behind the side cards** (they occlude), comments are **clickable → fill "go →" and navigate**. Toggle is the top-left "comments".
 
 ## Files
 ```
-server.py            FastAPI backend (model, streaming, embeddings, PCA, landmarks, navigate, vocab)
-static/index.html    entire UI (HTML+CSS+JS)
-run.sh               launcher (sources venv + .env)
-.env                 ANTHROPIC_API_KEY (chmod 600, gitignored)
-.gitignore           (.env)
-landmarks.json       user pins (description + 768-d embedding)   ← persists
-vocab.json           104 instrument/genre embeddings              ← persists, rebuilt if deleted
-amen_break.mp3, "Magnolian - Indigo (Official Video).mp3", "Suits Maps And Guns.mp3"   audio for style input
-uploads/, outputs/   scratch dirs
+server.py                 backend
+static/index.html         main app (HTML+CSS+JS)
+static/groove_cube.html   standalone Groove Cube (/groovecube)
+groove_dist/              built Morphing Groove Map (embedded iframe) + its wav/json (committed)
+tempo_refs/beat_*.wav     151 kick beats 50-200 BPM (GITIGNORED, ~133MB) — regen: python tools/make_tempo_beats.py
+agr/*.agr                 12 Ableton groove files (served at /agr, parsed client-side)
+tools/make_tempo_beats.py regenerates tempo_refs
+landmarks.json            pins (gitignored)   vocab.json  embedding cache (committed)
+.env                      ANTHROPIC_API_KEY (chmod 600, gitignored)
+run.sh                    launcher
 ```
+`.gitignore` excludes: `.env`, `__pycache__`, `outputs/`, `uploads/`, `*.mp3`, `landmarks.json`, `*.bak`, `tempo_refs/`, `.DS_Store`. (Large `.mp3` style clips live in the folder, gitignored.)
 
-## Open items / next steps
-- **Add Anthropic API credits** to unblock `go →` navigation (only blocker).
-- **Not a git repo / no remote.** The user asked to commit+push; nothing is initialized here yet. If asked again: `git init` here, then create a GitHub repo (gh is authed as `lucastsui`) and push — confirm name/visibility first. (Don't conflate with `~/Desktop/Music_Hackathon`, a *separate* project — "morphing-groove-map" — which has its own `status_quo.md` and remote.)
-- Polish ideas raised but not done: smarter hover-label placement near edges; preset cards clickable-to-play; project the prompt-mix position as its own cube dot; persist presets (currently session-only; pins/vocab persist).
+## Concepts that took iteration to get right
+- **Tempo:** MRT2 has **no BPM input** (verified — no tempo/velocity params; note control is a 4-state pianoroll, drums binary). Tempo is steered *softly* by feeding a clean kick-beat reference (`tempo_refs/`) as an audio style prompt; the tempo slider picks the BPM file, the weight slider sets its mix strength. Genre/percussiveness transfers too.
+- **.stt / .agr ↔ the bars:** an `.agr` (Ableton MIDI-clip groove) folds onto the 16-slot strip (timing ms + velocity per 16th). MRT2 itself can't apply microtiming (its control grid is 25 fps); the groove engine works on a *fixed beat* (known onsets), which is why the Groove instrument is its own synth loop, not MRT2.
+- **Two cubes:** the main cube = MusicCoCa **style** space (drives MRT2). The Groove instrument's pad = a separate **groove** PCA space (timing+velocity of groove files). They are NOT interchangeable.
+
+## Verification habits
+- JS: extract `<script>` and `node --check`. Server: `python -c "import ast; ast.parse(open('server.py').read())"`.
+- `curl` endpoints. Live stream / pin-play can't be tested while the browser holds `_gen_lock`. Playwright MCP is often locked by the user's open browser.
+
+## Open ideas (not done)
+- Tempo strength is now a slider (done). Could add a strength/off for the danmaku-driven navigation.
+- Danmaku reacts to the prompt *text*, not the live cube position — could feed the current nearest-vocab words instead.
+- `.agr` import only in the inline Groove instrument + the embedded Groove map; not wired to drive MRT2 generation (groove vs style domains).

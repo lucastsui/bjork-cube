@@ -661,6 +661,15 @@ async def vocab_points():
                        for v in _vocab.values()]}
 
 
+@app.get("/agr_list")
+def agr_list():
+    """List the .agr groove files in the agr/ folder (served at /agr/<name>)."""
+    d = HERE / "agr"
+    if not d.is_dir():
+        return {"files": []}
+    return {"files": sorted(f.name for f in d.iterdir() if f.suffix.lower() == ".agr")}
+
+
 @app.post("/landmark")
 async def add_landmark(request: Request):
     """Pin the current position with a user description ('chill like beach')."""
@@ -987,6 +996,8 @@ async def stream(ws: WebSocket):
         drum_tokens = mrt._drum_tokens
         state = None
         step = 0
+        seq_carry = 0.0   # fractional frames-per-step accumulator -> exact average BPM on the 40ms grid
+        underrun_margin = 0.0   # persistent extra buffer lead added after a client gap (decays back)
 
         # --- Adaptive pacing & chunk sizing ---------------------------------
         # Apply new input as fast as possible (small chunk + small buffer lead)
@@ -1009,7 +1020,10 @@ async def stream(ws: WebSocket):
             if seq_mode:
                 n_steps = int(seq["steps"])
                 i = step % n_steps
-                frames = max(1, int(seq.get("fps", STREAM_FRAMES)))
+                fps_f = float(seq.get("fps", STREAM_FRAMES))
+                seq_carry += fps_f
+                frames = max(1, int(round(seq_carry)))   # dither: integer frames, exact average tempo
+                seq_carry -= frames
                 active = seq.get("notes", [])
                 active_i = active[i] if i < len(active) else []
                 notes = [-1] * num_notes
@@ -1054,15 +1068,20 @@ async def stream(ws: WebSocket):
                 t_start = t0
             audio_sent += audio_dur
 
-            # Client reported an actual buffer gap -> back off hard.
+            # Client reported an actual buffer gap -> add a PERSISTENT safety margin
+            # (previously this was overwritten on the next line, so it never took effect).
             if ctl.get("underrun", 0) > 0:
                 ctl["underrun"] = 0
                 chunk = min(CHUNK_MAX, chunk + 10)
-                target_lead = min(1.5, target_lead + 0.20)
+                underrun_margin = min(0.8, underrun_margin + 0.20)
+            else:
+                underrun_margin = max(0.0, underrun_margin - 0.01)   # slowly win responsiveness back
 
-            # Size the buffer lead to cover the worst recent generation time
-            # (must be >= one generation, or the buffer drains while we compute).
-            target_lead = min(2.5, max(0.12, 1.3 * max(gen_hist)))
+            # Size the buffer lead to cover recent generation time. In seq mode use a
+            # tighter lead + shorter memory so edits are heard sooner; free-run stays safe.
+            recent = list(gen_hist)[-5:] if seq_mode else list(gen_hist)
+            mult, floor = (1.15, 0.08) if seq_mode else (1.3, 0.12)
+            target_lead = min(2.5, max(floor, mult * max(recent)) + underrun_margin)
 
             # Adapt free-run chunk: push it DOWN to cut latency while RTF has
             # headroom; push it UP when generation gets too close to real time.
@@ -1139,5 +1158,8 @@ for _fn in GROOVE_ROOT_FILES:
 # Mount the hashed JS/CSS assets only if present, so an absent groove_dist/ can't crash startup.
 if (GROOVE_DIST / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=GROOVE_DIST / "assets"), name="groove-assets")
+
+if (HERE / "agr").is_dir():
+    app.mount("/agr", StaticFiles(directory=HERE / "agr"), name="agr")   # raw .agr files for client-side parsing
 
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")

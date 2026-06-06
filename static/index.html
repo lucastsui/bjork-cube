@@ -202,8 +202,9 @@
       <button id="giStop" class="mini" disabled>■ stop</button>
       <label style="display:flex;align-items:center;gap:6px">BPM <input type="number" id="giBpm" min="50" max="200" value="96" style="width:58px"></label>
       <select id="giPattern" style="background:var(--ink-850);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px;font:inherit">
-        <option value="0">Boom-bap</option><option value="1">Four-on-floor</option><option value="2">16th hats</option>
+        <option value="0">Boom-bap</option><option value="1">Four-on-floor</option><option value="2">16th hats</option><option value="3">Drum &amp; bass</option><option value="4">UK garage</option>
       </select>
+      <button id="giToPrompt" class="mini" title="bounce this swung loop to a WAV and add it as a Style audio prompt">↗ use as style prompt</button>
       <span id="giStatus" class="hint" style="margin:0"></span>
     </div>
     <div class="row" style="gap:12px; align-items:stretch">
@@ -211,6 +212,28 @@
       <canvas id="giStrip" title="per-16th timing (▲late ▼early) + volume"></canvas>
     </div>
     <div id="giList" class="chips" style="margin-top:8px; max-height:64px; overflow:auto"></div>
+    <div class="hint" style="margin:8px 0 2px">groove files (.agr) — click to set the bars:</div>
+    <div id="giAgr" class="chips" style="max-height:70px; overflow:auto"></div>
+  </div>
+</div>
+
+<!-- Step sequencer: note + drum onsets that natively condition MRT2 generation (seq -> /stream). -->
+<div class="ov ov-bc" id="seqPanel" style="bottom:66px; max-width:min(700px,68vw)">
+  <div class="ovhead" id="seqHead"><h2 style="margin:0">Step sequencer</h2><span class="caret" id="seqCaret">▼</span></div>
+  <div id="seqBody" style="display:none">
+    <div class="row" style="gap:12px; margin:0 0 8px; flex-wrap:wrap; align-items:center">
+      <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="seqOn"> condition the music</label>
+      <label style="display:flex;align-items:center;gap:6px">steps
+        <select id="seqSteps" style="background:var(--ink-850);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:4px"><option>8</option><option selected>16</option></select></label>
+      <label style="display:flex;align-items:center;gap:6px">bpm <input type="range" id="seqBpm" min="40" max="200" step="1" value="94" style="width:120px"><input type="number" id="seqBpmN" min="40" max="200" step="1" value="94" style="width:54px"><span id="seqBpm_v" class="hint"></span></label>
+      <button id="seqClear" class="mini">clear</button>
+      <span id="seqHint" class="hint" style="margin:0">off · style-only</span>
+    </div>
+    <div class="row" style="gap:16px; margin:0 0 8px; flex-wrap:wrap; align-items:center">
+      <div class="slider" style="flex:1; min-width:160px"><span class="lab">cfg · notes</span><input type="range" id="cfg_notes" min="-1" max="7" step="0.1" value="7"><span class="val" id="cfg_notes_v"></span></div>
+      <div class="slider" style="flex:1; min-width:160px"><span class="lab">cfg · drums</span><input type="range" id="cfg_drums" min="-1" max="7" step="1" value="7"><span class="val" id="cfg_drums_v"></span></div>
+    </div>
+    <div id="seqGrid" style="overflow:auto; max-height:calc(50vh - 190px)"></div>
   </div>
 </div>
 
@@ -271,8 +294,6 @@
       </div>
       <div>
         <div class="slider"><span class="lab">cfg · style</span><input type="range" id="cfg_musiccoca" min="-1" max="7" step="0.1" value="3.0"><span class="val" id="cfg_musiccoca_v"></span></div>
-        <div class="slider"><span class="lab">cfg · notes</span><input type="range" id="cfg_notes" min="-1" max="7" step="0.1" value="1.0"><span class="val" id="cfg_notes_v"></span></div>
-        <div class="slider"><span class="lab">cfg · drums</span><input type="range" id="cfg_drums" min="-1" max="6" step="1" value="1"><span class="val" id="cfg_drums_v"></span></div>
       </div>
     </div>
     <div class="hint">CFG = how strictly the model obeys each condition. Higher → more literal, lower → freer.</div>
@@ -899,7 +920,7 @@ async function refreshEmbedding() {
   try {
     const r = await fetch("/embedding", { method: "POST", body: fd });
     if (!r.ok) return;
-    drawEmbedding(await r.json());
+    const j = await r.json(); drawEmbedding(j); projectToPCA(j.embedding);   // dot tracks the previewed style
   } catch (e) {}
 }
 
@@ -1051,7 +1072,7 @@ async function start(seed) {
   }
   if (userStop) return;   // user paused mid-prepare
   const token = sj.token;
-  drawEmbedding(sj);
+  drawEmbedding(sj); projectToPCA(sj.embedding);   // move the cube dot to the playing style (so drift starts here, no jump)
 
   try { if (ctx) ctx.close(); } catch {}
   ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
@@ -1064,12 +1085,13 @@ async function start(seed) {
   ws = new WebSocket(`${proto}://${location.host}/stream`);
   ws.binaryType = "arraybuffer";
 
-  ws.onopen = () => ws.send(JSON.stringify(Object.assign({ token }, paramsMsg(), { type: "init" })));
+  ws.onopen = () => { ws.send(JSON.stringify(Object.assign({ token }, paramsMsg(), { type: "init" }))); ws.send(JSON.stringify({ type: "seq", seq: seqMsg() })); };
   ws.onmessage = (ev) => {
     if (typeof ev.data === "string") {
       const m = JSON.parse(ev.data);
       if (m.type === "ready") { sampleRate = m.sample_rate; everReady = true; reconnectN = 0; log("🔊 Streaming live · " + sampleRate + "Hz"); setDot("live"); playing = true; $("pause").disabled = false; }
       else if (m.type === "perf") { showPerf(m); }
+      else if (m.type === "step") { seqHighlight(m.i); }
       else if (m.type === "error") { log("⚠️ " + m.msg); /* onclose follows -> auto-retry with backoff */ }
       return;
     }
@@ -1128,13 +1150,61 @@ sliders.forEach(id => $(id).addEventListener("change", () => {
   if (playing && ws && ws.readyState === 1 && id !== "seed") ws.send(JSON.stringify(paramsMsg()));
 }));
 
+// ---- Step sequencer: note + drum onsets that natively condition MRT2 (seq -> /stream) ----
+const SEQ_PITCHES = (() => { const scale=[0,2,4,5,7,9,11], out=[]; for(let oct=4;oct<=5;oct++) for(const s of scale) out.push(12*oct+12+s); out.push(84); return out.reverse(); })();  // C4..C6, C-major, highest row first
+let seqSteps=16, seqRate=4, seqNotes=[], seqDrums=[];
+function seqInit(){ seqNotes=Array.from({length:seqSteps},()=>new Set()); seqDrums=Array(seqSteps).fill(0); }
+seqInit();
+function seqMsg(){ return $("seqOn").checked ? { steps:seqSteps, fps:seqRate, notes:seqNotes.map(s=>[...s]), drums:seqDrums.slice() } : null; }
+function pushSeq(){ if (playing && ws && ws.readyState === 1) ws.send(JSON.stringify({ type:"seq", seq:seqMsg() })); }
+function seqCell(s,on,drum){ const beat=s%4===0; const bg=on?(drum?"#e0795a":"var(--accent,#7c5cff)"):(beat?"rgba(255,255,255,.10)":"rgba(255,255,255,.045)"); return `display:inline-block;width:18px;height:14px;margin:1px;border-radius:3px;cursor:pointer;vertical-align:middle;background:${bg};`; }
+function buildSeqGrid(){
+  const g=$("seqGrid"); g.innerHTML=""; const NN=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  const tbl=document.createElement("div"); tbl.style.cssText="display:inline-block;font-size:0";
+  const drow=document.createElement("div"); drow.style.cssText="white-space:nowrap;margin-bottom:4px";   // drum row on top
+  const dlab=document.createElement("span"); dlab.textContent="drums"; dlab.style.cssText="display:inline-block;width:34px;font-size:10px;color:#e0795a;text-align:right;padding-right:4px;vertical-align:middle";
+  drow.appendChild(dlab);
+  for(let s=0;s<seqSteps;s++){ const c=document.createElement("span"); c.className="seqcell"; c.dataset.s=s;
+    c.style.cssText=seqCell(s,seqDrums[s],true);
+    c.addEventListener("click",()=>{ seqDrums[s]=seqDrums[s]?0:1; c.style.cssText=seqCell(s,seqDrums[s],true); pushSeq(); });
+    drow.appendChild(c); }
+  tbl.appendChild(drow);
+  SEQ_PITCHES.forEach(midi=>{
+    const row=document.createElement("div"); row.style.whiteSpace="nowrap";
+    const lab=document.createElement("span"); lab.textContent=NN[midi%12]+(Math.floor(midi/12)-1);
+    lab.style.cssText="display:inline-block;width:34px;font-size:10px;color:var(--muted);text-align:right;padding-right:4px;vertical-align:middle";
+    row.appendChild(lab);
+    for(let s=0;s<seqSteps;s++){ const c=document.createElement("span"); c.className="seqcell"; c.dataset.s=s;
+      c.style.cssText=seqCell(s,seqNotes[s].has(midi),false);
+      c.addEventListener("click",()=>{ seqNotes[s].has(midi)?seqNotes[s].delete(midi):seqNotes[s].add(midi); c.style.cssText=seqCell(s,seqNotes[s].has(midi),false); pushSeq(); });
+      row.appendChild(c); }
+    tbl.appendChild(row);
+  });
+  g.appendChild(tbl);
+}
+function seqHighlight(i){ document.querySelectorAll("#seqGrid .seqcell").forEach(c=>{ c.style.outline = (+c.dataset.s===i) ? "1px solid rgba(255,255,255,.65)" : "none"; }); }
+$("seqOn").addEventListener("change",()=>{ $("seqHint").textContent=$("seqOn").checked?"conditioning ON · the model follows these onsets (use cfg·notes/cfg·drums)":"off · style-only"; if(!$("seqOn").checked) seqHighlight(-1); pushSeq(); });
+$("seqSteps").addEventListener("change",e=>{ seqSteps=+e.target.value; seqInit(); buildSeqGrid(); pushSeq(); });
+// BPM slider -> fractional frames/step (375/bpm at 4 steps/beat = 16 steps/bar), steps unchanged.
+// The server error-diffuses it to integer frames, so the AVERAGE tempo is exactly this bpm
+// (with <=~20ms per-step jitter, unavoidable on the 25fps grid).
+function seqSetBpm(bpm){ seqRate=375/bpm; $("seqBpm_v").textContent=`${bpm} bpm · ${Math.round(seqRate*40)}ms/step avg`; }
+$("seqBpm").addEventListener("input",e=>{ $("seqBpmN").value=e.target.value; seqSetBpm(+e.target.value); });
+$("seqBpm").addEventListener("change",pushSeq);
+$("seqBpmN").addEventListener("input",e=>{ const v=Math.max(40,Math.min(200,Math.round(+e.target.value||94))); $("seqBpm").value=v; seqSetBpm(v); });
+$("seqBpmN").addEventListener("change",pushSeq);
+$("seqClear").addEventListener("click",()=>{ seqInit(); buildSeqGrid(); pushSeq(); });
+$("seqHead").addEventListener("click",()=>{ const b=$("seqBody"), open=b.style.display==="none"; b.style.display=open?"":"none"; $("seqCaret").textContent=open?"▲":"▼"; const gi=$("giPanel"); if(gi) gi.style.display=open?"none":""; if(open) buildSeqGrid(); });
+seqSetBpm(+$("seqBpm").value);
+buildSeqGrid();
+
 // Changing the prompt / audio / seed while playing re-embeds the style live.
 async function restyleLive() {
   if (!(playing && ws && ws.readyState === 1)) return;
   try {
     const sj = await prepareStyle();
     ws.send(JSON.stringify({ type: "style", token: sj.token }));
-    drawEmbedding(sj);
+    drawEmbedding(sj); projectToPCA(sj.embedding);   // keep the cube dot on the live style
     log("Style updated live"); setDot("live");
   } catch (e) { log("⚠️ " + e.message); }
 }
@@ -1242,7 +1312,7 @@ async function applyRawEmbedding(vec) {
 
 // Project a 768-d embedding into PCA coords so the cube dot moves with it.
 function projectToPCA(vec) {
-  if (!pcaData || !pcaData.k) return;
+  if (!pcaData || !pcaData.k || !vec || !vec.length) return;
   const mean = pcaData.mean, comps = pcaData.components;
   for (let k = 0; k < pcaData.k; k++) {
     let d = 0; const c = comps[k];
@@ -1409,6 +1479,8 @@ $("grooveExpand").addEventListener("click", () => {
     {kick:Pat('x.......x..x....'),snare:Pat('....x.......x...'),hat:Pat('x.x.x.x.x.x.x.x.')},
     {kick:Pat('x...x...x...x...'),snare:Pat('....x.......x...'),hat:Pat('..x...x...x...x.')},
     {kick:Pat('x.....x.x.......'),snare:Pat('....x.......x...'),hat:Pat('xxxxxxxxxxxxxxxx')},
+    {kick:Pat('x.........x.....'),snare:Pat('....x.......x...'),hat:Pat('..x...x...x...x.')},  // drum & bass (2-step)
+    {kick:Pat('x.....x...x.....'),snare:Pat('....x.......x...'),hat:Pat('..x.x.x.x.x.x.xx')},  // uk garage (skippy 2-step; shuffle via the swing bars)
   ];
   const FLAT=Array(SLOTS).fill(1), ZERO=Array(SLOTS).fill(0);
   const mkv=a=>{const v=FLAT.slice();a.forEach(([i,x])=>v[i]=x);return v;};
@@ -1417,7 +1489,7 @@ $("grooveExpand").addEventListener("click", () => {
     {name:'★ ghost funk',timing:[0,0,4,0,0,0,4,0,0,0,4,0,0,0,4,0],velocity:mkv([[0,1.2],[4,1.2],[8,1.2],[12,1.2],[1,.35],[3,.4],[5,.35],[7,.4],[9,.35],[11,.4],[13,.35],[15,.4]])},
     {name:'★ crescendo',timing:ZERO.slice(),velocity:Array.from({length:SLOTS},(_,i)=>0.5+i/(SLOTS-1))},
   ];
-  let grooves=[], pca=null, cur=[], patIdx=0, playSlot=0;
+  let grooves=[], pca=null, cur=[], patIdx=0, playSlot=0, override=null;
   const vecOf=g=>g.timing.concat(g.velocity.map(v=>v*VEL_SCALE));
 
   async function load(){
@@ -1429,10 +1501,10 @@ $("grooveExpand").addEventListener("click", () => {
       pca=await r.json(); pca.k=Math.min(pca.k,pca.components.length); cur=new Array(pca.k).fill(0);
     }catch(e){ $('giStatus').textContent='groove load failed'; return; }
     $('giStatus').textContent=grooves.length+' grooves';
-    renderList(); drawPad(); drawStrip();
+    renderList(); populateAgr(); drawPad(); drawStrip();
   }
   function recon(){ const v=pca.mean.slice(); for(let k=0;k<pca.components.length;k++){ const c=cur[k]; if(!c)continue; const cp=pca.components[k]; for(let i=0;i<v.length;i++) v[i]+=c*cp[i]; } return v; }
-  function curGroove(){ const v=recon(); return {timing:v.slice(0,SLOTS), velocity:v.slice(SLOTS,2*SLOTS).map(x=>Math.max(0,Math.min(1.6,x/VEL_SCALE)))}; }
+  function curGroove(){ if(override) return override; const v=recon(); return {timing:v.slice(0,SLOTS), velocity:v.slice(SLOTS,2*SLOTS).map(x=>Math.max(0,Math.min(1.6,x/VEL_SCALE)))}; }
 
   const R0=()=>pca.ranges[0], R1=()=>pca.ranges[1]||[-1,1];
   function nrm(co){ const [lo0,hi0]=R0(),[lo1,hi1]=R1(); return [ (co[0]-lo0)/((hi0-lo0)||1), (co[1]-lo1)/((hi1-lo1)||1) ]; }
@@ -1448,7 +1520,7 @@ $("grooveExpand").addEventListener("click", () => {
   function setFromPad(px,py){ const {w,h,p}=geo(); const nx=Math.max(0,Math.min(1,(px-p)/((w-2*p)||1))), ny=Math.max(0,Math.min(1,1-(py-p)/((h-2*p)||1)));
     const [lo0,hi0]=R0(),[lo1,hi1]=R1(); cur[0]=lo0+nx*(hi0-lo0); cur[1]=lo1+ny*(hi1-lo1); }
   let padDrag=false;
-  $('giPad').addEventListener('pointerdown',e=>{ if(!pca)return; const [px,py]=padAt(e); const {mx,my}=geo();
+  $('giPad').addEventListener('pointerdown',e=>{ if(!pca)return; override=null; const [px,py]=padAt(e); const {mx,my}=geo();
     let best=11,fi=-1; (pca.coords||[]).forEach((co,i)=>{const [nx,ny]=nrm(co);const dd=Math.hypot(px-mx(nx),py-my(ny)); if(dd<best){best=dd;fi=i;}});
     if(fi>=0){ cur=pca.coords[fi].slice(); $('giStatus').textContent=grooves[fi].name; } else setFromPad(px,py);
     padDrag=true; $('giPad').setPointerCapture(e.pointerId); drawPad(); drawStrip(); e.preventDefault(); });
@@ -1490,10 +1562,96 @@ $("grooveExpand").addEventListener("click", () => {
   $('giPlay').addEventListener('click',play); $('giStop').addEventListener('click',stop);
   $('giPattern').addEventListener('change',e=>{patIdx=+e.target.value; drawStrip();});
 
-  function renderList(){ const el=$('giList'); el.innerHTML=''; grooves.forEach((g,i)=>{ const b=document.createElement('span'); b.className='chip'; b.style.cursor='pointer'; b.textContent=g.name;
-    b.addEventListener('click',()=>{ cur=pca.coords[i].slice(); $('giStatus').textContent=g.name; drawPad(); drawStrip(); }); el.appendChild(b); }); }
+  // ---- bounce the current swung loop (offline) to a WAV, add it as a Style audio prompt ----
+  function bufToWav(buf){
+    const ch=buf.getChannelData(0), sr=buf.sampleRate, n=ch.length, ab=new ArrayBuffer(44+n*2), dv=new DataView(ab);
+    const ws=(o,s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(o+i,s.charCodeAt(i)); };
+    ws(0,'RIFF'); dv.setUint32(4,36+n*2,true); ws(8,'WAVE'); ws(12,'fmt '); dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
+    dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true); ws(36,'data'); dv.setUint32(40,n*2,true);
+    let o=44; for(let i=0;i<n;i++){ const s=Math.max(-1,Math.min(1,ch[i])); dv.setInt16(o,s<0?s*0x8000:s*0x7fff,true); o+=2; }
+    return new Blob([ab],{type:'audio/wav'});
+  }
+  async function bounce(bars){
+    const bpm=+$('giBpm').value||96, spv=(60/bpm)/4, slots=SLOTS*(bars||4), sr=48000;
+    const oc=new OfflineAudioContext(1, Math.ceil((slots*spv+0.3)*sr), sr);
+    const mg=oc.createGain(); mg.gain.value=0.9; mg.connect(oc.destination);
+    const nb=oc.createBuffer(1,Math.floor(sr*0.3),sr), nd=nb.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
+    const Gc=v=>Math.max(0.0008,Math.min(1.4,v));
+    const K=(t,v)=>{const o=oc.createOscillator(),g=oc.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(50,t+0.12);g.gain.setValueAtTime(Gc(v),t);g.gain.exponentialRampToValueAtTime(0.001,t+0.16);o.connect(g).connect(mg);o.start(t);o.stop(t+0.18);};
+    const S=(t,v)=>{const s=oc.createBufferSource();s.buffer=nb;const f=oc.createBiquadFilter();f.type='highpass';f.frequency.value=1300;const g=oc.createGain();g.gain.setValueAtTime(Gc(v*0.8),t);g.gain.exponentialRampToValueAtTime(0.001,t+0.18);s.connect(f).connect(g).connect(mg);s.start(t);s.stop(t+0.2);};
+    const H=(t,v)=>{const s=oc.createBufferSource();s.buffer=nb;const f=oc.createBiquadFilter();f.type='highpass';f.frequency.value=7500;const g=oc.createGain();g.gain.setValueAtTime(Gc(v*0.5),t);g.gain.exponentialRampToValueAtTime(0.001,t+0.045);s.connect(f).connect(g).connect(mg);s.start(t);s.stop(t+0.05);};
+    const g=curGroove(), pat=PATTERNS[patIdx];
+    for(let nn=0;nn<slots;nn++){ const i=nn%SLOTS, t=Math.max(0,0.05+nn*spv+(g.timing[i]||0)/1000), v=g.velocity[i];
+      if(pat.kick[i]) K(t,v); if(pat.snare[i]) S(t,v); if(pat.hat[i]) H(t,v*0.9); }
+    const rb=await oc.startRendering();
+    const ch=rb.getChannelData(0);
+    let pk=0; for(let i=0;i<ch.length;i++){ const a=Math.abs(ch[i]); if(a>pk)pk=a; }
+    if(pk>1e-4){ const g0=1/pk; for(let i=0;i<ch.length;i++) ch[i]*=g0; }        // 1) hits to full scale
+    const DRIVE=6;                                                               // 2) saturate -> raise AVG energy (RMS),
+    for(let i=0;i<ch.length;i++) ch[i]=Math.tanh(ch[i]*DRIVE);                   //    squashes dynamics so it's not read as "quiet/sparse"
+    let pk2=0; for(let i=0;i<ch.length;i++){ const a=Math.abs(ch[i]); if(a>pk2)pk2=a; }
+    if(pk2>1e-4){ const g1=0.97/pk2; for(let i=0;i<ch.length;i++) ch[i]*=g1; }   // 3) normalize peak
+    return rb;
+  }
+  async function useAsPrompt(){
+    if(!pca){ $('giStatus').textContent='need grooves first'; return; }
+    const btn=$('giToPrompt'); btn.disabled=true; $('giStatus').textContent='bouncing…';
+    try{
+      const buf=await bounce(4);
+      const file=new File([bufToWav(buf)],'groove-swing.wav',{type:'audio/wav'});
+      addInput('audio','',0.5,file); onStyleChange();   // adds a Style audio row + re-embeds
+      $('giStatus').textContent='added to Style ✓ (weight 0.5)';
+    }catch(e){ console.error(e); $('giStatus').textContent='bounce failed'; }
+    finally{ btn.disabled=false; }
+  }
+  $('giToPrompt').addEventListener('click',useAsPrompt);
 
-  $('giHead').addEventListener('click',()=>{ const b=$('giBody'), open=b.style.display==='none'; b.style.display=open?'':'none'; $('giCaret').textContent=open?'▲':'▼'; if(open){ drawPad(); drawStrip(); } });
+  function renderList(){ const el=$('giList'); el.innerHTML=''; grooves.forEach((g,i)=>{ const b=document.createElement('span'); b.className='chip'; b.style.cursor='pointer'; b.textContent=g.name;
+    b.addEventListener('click',()=>{ override=null; cur=pca.coords[i].slice(); $('giStatus').textContent=g.name; clearAgrHl(); drawPad(); drawStrip(); }); el.appendChild(b); }); }
+
+  // ---- .agr groove presets: parse an Ableton .agr -> 16-slot timing/velocity, set the bars ----
+  function clearAgrHl(){ const el=$('giAgr'); if(el)[...el.children].forEach(c=>c.style.borderColor=''); }
+  async function loadAgr(name){
+    try{
+      const buf = await (await fetch('/agr/'+encodeURIComponent(name))).arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let xml;
+      if(bytes.length>=2 && bytes[0]===0x1f && bytes[1]===0x8b){
+        const s = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+        xml = await new Response(s).text();
+      } else xml = new TextDecoder().decode(buf);
+      const doc = new DOMParser().parseFromString(xml,'application/xml');
+      if(doc.getElementsByTagName('parsererror').length) throw 0;
+      const gv = sel => { const e=doc.querySelector(sel); return e?e.getAttribute('Value'):null; };
+      const num=+(gv('Numerator')||4), den=+(gv('Denominator')||4), le=gv('LoopEnd');
+      const barBeats = le!=null ? +le : num*4/den;
+      const notes = [...doc.getElementsByTagName('MidiNoteEvent')].map(el=>({t:+(el.getAttribute('Time')||0), v:+(el.getAttribute('Velocity')||0)}));
+      if(!notes.length || !(barBeats>0)) throw 0;
+      const bpm = +$("tempoBpm").value || 120, slotBeats = barBeats/SLOTS;
+      const tSum=Array(SLOTS).fill(0), vSum=Array(SLOTS).fill(0), cnt=Array(SLOTS).fill(0);
+      for(const n of notes){
+        let pos = n.t % barBeats; if(pos<0) pos+=barBeats;
+        const slot = Math.round(pos/slotBeats) % SLOTS;
+        const offMs = (pos - slot*slotBeats) * (60/bpm) * 1000;   // beat-offset -> ms at current tempo
+        tSum[slot]+=offMs; vSum[slot]+=n.v; cnt[slot]++;
+      }
+      const timing=[], velocity=[];
+      for(let i=0;i<SLOTS;i++){ timing.push(cnt[i]?tSum[i]/cnt[i]:0); velocity.push(cnt[i]?(vSum[i]/cnt[i])/127:0); }
+      override = { timing, velocity };                            // bars now show this .agr's profile
+      $('giStatus').textContent = name.replace(/\.agr$/i,'');
+      clearAgrHl(); const el=$('giAgr'); if(el)[...el.children].forEach(c=>{ if(c.dataset.name===name) c.style.borderColor='#23c08a'; });
+      drawStrip(); drawPad();
+    }catch(e){ $('giStatus').textContent='couldn’t read '+name; }
+  }
+  async function populateAgr(){
+    let files=[]; try{ files=(await (await fetch('/agr_list')).json()).files||[]; }catch(e){}
+    const el=$('giAgr'); if(!el) return; el.innerHTML='';
+    files.forEach(name=>{ const b=document.createElement('span'); b.className='chip'; b.style.cursor='pointer'; b.dataset.name=name;
+      b.textContent = name.replace(/\.agr$/i,'').replace(/^MIDI /,''); b.title=name;
+      b.addEventListener('click',()=>loadAgr(name)); el.appendChild(b); });
+  }
+
+  $('giHead').addEventListener('click',()=>{ const b=$('giBody'), open=b.style.display==='none'; b.style.display=open?'':'none'; $('giCaret').textContent=open?'▲':'▼'; const sp=$('seqPanel'); if(sp) sp.style.display=open?'none':''; if(open){ drawPad(); drawStrip(); } });
   window.addEventListener('resize',()=>{ if($('giBody').style.display!=='none'){ drawPad(); drawStrip(); } });
 
   load();
