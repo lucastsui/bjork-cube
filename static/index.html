@@ -519,6 +519,18 @@ async function feelingLucky() {
 }
 $("luckyBtn").addEventListener("click", feelingLucky);
 
+// Seed the space with a few diverse presets on first load, so the cube/PCA is
+// usable immediately (needs >=2 presets). Runs once; presets aren't persisted.
+const DEFAULT_PRESETS = ["gothic techno", "warm ambient pads", "aggressive drum and bass",
+  "dreamy synthwave", "lo-fi jazzy hip hop", "epic cinematic orchestral",
+  "funky disco groove", "dark industrial"];
+async function loadDefaultPresets() {
+  if (presets.length) return;
+  $("presetsHint").textContent = "loading a few starter presets…";
+  for (const t of DEFAULT_PRESETS) { try { await addPresetFromText(t); renderPresets(); } catch (e) {} }
+}
+loadDefaultPresets();
+
 // ---- PCA explorer: principal axes of the saved presets --------------------
 // For N presets the centered data has rank <= N-1, so we expose N-1 sliders.
 // The model input is reconstructed as  mean + Σ slider_k · component_k.
@@ -792,8 +804,9 @@ function cubeUp(e) {
   cubeDrag = null;
 }
 function syncPcaSliders() {
-  $("pca").querySelectorAll('input[type=range]').forEach((r, j) => {
-    if (j < pcaCoords.length) { r.value = pcaCoords[j]; const v = r.nextElementSibling; if (v) v.textContent = (+pcaCoords[j]).toFixed(2); }
+  $("pca").querySelectorAll('input[data-pc]').forEach(r => {   // only the PC sliders — NOT the cube-dims slider
+    const k = +r.dataset.pc;
+    if (k < pcaCoords.length) { r.value = pcaCoords[k]; const v = r.nextElementSibling; if (v) v.textContent = (+pcaCoords[k]).toFixed(2); }
   });
 }
 (function bindCube() {
@@ -832,7 +845,7 @@ function renderPCA() {
     const row = document.createElement("div"); row.className = "slider";
     const lab = document.createElement("span"); lab.className = "lab";
     lab.textContent = `PC${k + 1} · ${(pcaData.explained[k] * 100).toFixed(0)}%`;
-    const r = document.createElement("input"); r.type = "range";
+    const r = document.createElement("input"); r.type = "range"; r.dataset.pc = k;
     r.min = lo; r.max = hi; r.step = (hi - lo) / 200 || 0.001; r.value = pcaCoords[k];
     const v = document.createElement("span"); v.className = "val"; v.textContent = (+pcaCoords[k]).toFixed(2);
     r.addEventListener("input", () => {
