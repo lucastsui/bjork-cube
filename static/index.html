@@ -214,12 +214,13 @@
   .dm-item.aud{ color:var(--accent2); }
   .dm-item.aud::before{ content:"\25CF "; }
   .dm-tog { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; white-space:nowrap; cursor:pointer; user-select:none; text-shadow:0 1px 2px rgba(0,0,0,.8); }
-  #dmCtl { position:fixed; top:62px; left:354px; z-index:20; display:flex; align-items:center; }
+  #dmCtl { position:fixed; top:62px; left:354px; z-index:20; display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
 </style>
 </head>
 <body>
 <div class="topbar">
   <h1>Morphing Music Map</h1>
+  <span id="nowWords" aria-live="polite" title="what's playing now, in words" style="color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:24vw"></span>
 
   <button id="play" class="tbtn play" title="Play (start continuous stream)" aria-label="Play">
     <svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg>
@@ -230,14 +231,15 @@
   <span id="dot" class="dot"></span>
   <canvas id="embChart" title="model input · style embedding"></canvas>
   <canvas id="waveTape" title="model output · live waveform (newest on the right)"></canvas>
-  <span id="log" class="hint"></span>
+  <span id="log" class="hint" role="status" aria-live="polite"></span>
   <span id="perf" class="hint"></span>
 </div>
 
-<canvas id="pcaCube"></canvas>
+<canvas id="pcaCube" role="img" aria-label="Interactive music-style map: a navigable hypercube where each point is a different sound. Use the controls to explore and steer the live AI music."></canvas>
 <div id="danmaku"></div>
 <div id="dmCtl">
   <label class="dm-tog" title="live Gen-Z suggestions for where to take the music"><input type="checkbox" id="dmToggle"> danmaku</label>
+  <label class="dm-tog" title="slowly auto-rotate the cube"><input type="checkbox" id="rotate"> slow rotation</label>
 </div>
 
 
@@ -303,8 +305,8 @@
     <h2>Style — mix prompts &amp; audio</h2>
     <div id="inputs"></div>
     <div class="btnrow" style="margin-top:4px; display:flex; gap:6px; flex-wrap:nowrap; align-items:center;">
-      <button id="addInput" class="mini" title="add input">+</button>
-      <button id="savePreset" class="mini" title="save preset"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+      <button id="addInput" class="mini" title="add input" aria-label="Add a style input">+</button>
+      <button id="savePreset" class="mini" title="save preset" aria-label="Save preset"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
       <button id="luckyBtn" class="mini">I'm feeling lucky</button>
     </div>
   </div>
@@ -325,8 +327,8 @@
     <div class="slider" style="margin-bottom:8px"><span class="lab">travel speed</span><input type="range" id="driftSpeed" min="0.05" max="5" step="0.05" value="1"><span class="val" id="driftSpeed_v"></span></div>
     <div class="row" style="gap:8px; margin-bottom:8px">
       <input type="text" id="describeBox" placeholder="describe this place… e.g. corporate music but with bass">
-      <button id="pinUp" class="mini" title="save a place you like">👍</button>
-      <button id="pinDown" class="mini" title="mark a place to avoid (repels navigation)">👎</button>
+      <button id="pinUp" class="mini" title="save a place you like" aria-label="Pin this place (save)">👍</button>
+      <button id="pinDown" class="mini" title="mark a place to avoid (repels navigation)" aria-label="Mark this place to avoid">👎</button>
     </div>
     <div class="row" style="gap:8px">
       <input type="text" id="navBox" placeholder="take me somewhere… e.g. heavy metal">
@@ -356,7 +358,7 @@
     <img id="audQr" src="/m_qr" alt="scan to join the audience app" style="display:block; width:160px; height:160px; background:#fff; border-radius:8px; padding:6px; margin:2px auto 8px">
   </div>
   <div id="groovePanel" class="sec2 gcol">
-    <div class="ovhead" id="grooveHead"><h2 style="margin:0">Groove map</h2><span class="caret" id="grooveCaret">▸</span><button id="grooveExpand" class="mini" title="expand">⤢</button></div>
+    <div class="ovhead" id="grooveHead"><h2 style="margin:0">Groove map</h2><span class="caret" id="grooveCaret">▸</span><button id="grooveExpand" class="mini" title="expand" aria-label="Expand the groove map">⤢</button></div>
     <div id="grooveWrap"><iframe id="grooveFrame" title="Morphing Groove Map"></iframe></div>
   </div>
   <div class="sec2">
@@ -765,7 +767,7 @@ function drawCube() {
       posTrail.push(cur); if (posTrail.length > 80) posTrail.shift();
     }
     for (let i = 1; i < posTrail.length; i++) {
-      if (posTrail[i].length !== k || posTrail[i - 1].length !== k) continue;
+      if (posTrail[i].length !== pcaData.k || posTrail[i - 1].length !== pcaData.k) continue;
       const a = P(pcaToU(posTrail[i - 1])), b = P(pcaToU(posTrail[i]));
       const al = (0.5 * (i / posTrail.length)).toFixed(3);   // older = fainter
       x.strokeStyle = `rgba(224,101,76,${al})`; x.lineWidth = 1.5;
@@ -950,6 +952,20 @@ function syncPcaSliders() {
 
 // Built-in vocabulary dots are always shown on the cube — load them once at startup.
 ensureVocabPoints().then(drawCube);
+
+// Slow auto-rotation of the cube (switch under the danmaku toggle).
+let rotateOn = false, _rotTimer = null;
+function rotateTick() {
+  if (!rotateOn || !R || !pcaData || !pcaData.k) return;
+  const k = cubeDimEff || pcaData.k;
+  if (k >= 3) rotatePlane(0, 2, 0.002); else rotatePlane(0, 1, 0.002);   // gentle slow turn
+  drawCube();
+}
+$("rotate").addEventListener("change", () => {
+  rotateOn = $("rotate").checked;
+  if (rotateOn && !_rotTimer) _rotTimer = setInterval(rotateTick, 40);    // ~25fps, ~50s per full turn
+  else if (!rotateOn && _rotTimer) { clearInterval(_rotTimer); _rotTimer = null; }
+});
 
 function renderPCA() {
   const c = $("pca"); c.innerHTML = "";
@@ -1480,7 +1496,7 @@ function onMIDI(ev) {
       else if (b1 === 37) gotoFurthestPoint();
       else if (b1 === 38) gotoRandomPoint();
       else if (b1 === 40) pauseTravel();
-      else if (b1 === 41) resumeTravel();
+      else if (b1 === 41) travelDirection();
     } else if (noteOff) _ch10Down.delete(b1);
   }
   else if (ch === 1) {                                  // grid (notes) -> channel 1 only
@@ -1668,7 +1684,7 @@ function applyNavFinal(j) {
 async function glideTo(j) {
   if (travelPaused) return;
   const target = j.embedding, start = lastVec ? lastVec.slice() : null;
-  slideA = start; slideB = target ? target.slice() : null;   // destination becomes point B (CC17 crossfades A->B)
+  slideA = start; slideB = target ? target.slice() : null; stopDir();   // destination becomes point B (CC17 crossfades A->B); a deliberate glide cancels directional travel
   const myId = ++glideId; gliding = true;   // pauses drift while traveling
   try {
     if (!start) { applyNavFinal(j); return; }   // no current point -> jump
@@ -1688,7 +1704,7 @@ async function glideTo(j) {
 async function glideToEmbedding(target) {
   if (travelPaused) return;
   const start = lastVec ? lastVec.slice() : null;
-  slideA = start; slideB = target ? target.slice() : null;   // destination becomes point B (CC17 crossfades A->B)
+  slideA = start; slideB = target ? target.slice() : null; stopDir();   // destination becomes point B (CC17 crossfades A->B); a deliberate glide cancels directional travel
   const myId = ++glideId; gliding = true;
   try {
     if (!start) { await applyRawEmbedding(target); return; }
@@ -1830,7 +1846,7 @@ function driftTick() {
   if (Math.random() < 0.035) dropFeelingMark();   // sporadically leave a "feeling" breadcrumb (~every 13s)
 }
 $("drift").addEventListener("change", () => {
-  if ($("drift").checked) { driftVel = null; driftTick(); driftTimer = setInterval(driftTick, DRIFT_MS); }
+  if ($("drift").checked) { stopDir(); driftVel = null; driftTick(); driftTimer = setInterval(driftTick, DRIFT_MS); }
   else { clearInterval(driftTimer); driftTimer = null; }
 });
 
@@ -1838,6 +1854,7 @@ $("drift").addEventListener("change", () => {
 function pauseTravel() {
   travelPaused = true;
   if (driftTimer) { clearInterval(driftTimer); driftTimer = null; }   // stop wandering
+  stopDir();                                                          // stop directional travel
   glideId++; gliding = false;                                          // cancel any in-flight glide
   log("⏸ travel paused");
 }
@@ -1847,6 +1864,33 @@ function resumeTravel() {
   if (!driftTimer) { driftVel = null; driftTimer = setInterval(driftTick, DRIFT_MS); }
   driftTick();                                             // move immediately, don't wait a tick
   log("▶ travel resumed (wandering)");
+}
+
+// Directional travel (ch10 note 41): keep moving along the LAST travel direction (slideB - slideA), past B.
+let dirVec = null, dirTimer = null;
+function stopDir() { if (dirTimer) { clearInterval(dirTimer); dirTimer = null; } }
+function dirTick() {
+  if (!lastVec || !dirVec || travelPaused || gliding) return;
+  const v = lastVec, n = v.length;
+  let ss = 0; for (const x of v) ss += x * x; const norm = Math.sqrt(ss) || 1;
+  const step = 0.03 * travelSpeed() * norm;
+  const out = new Array(n); let s2 = 0;
+  for (let i = 0; i < n; i++) { out[i] = v[i] + step * dirVec[i]; s2 += out[i] * out[i]; }
+  const sc = norm / (Math.sqrt(s2) || 1);   // keep magnitude steady (stay on the embedding shell)
+  for (let i = 0; i < n; i++) out[i] *= sc;
+  applyRawEmbedding(out);
+}
+function travelDirection() {
+  if (!slideA || !slideB) { log("no direction yet — travel somewhere first"); return; }
+  dirVec = slideB.map((b, i) => b - slideA[i]);
+  let dn = 0; for (const x of dirVec) dn += x * x; dn = Math.sqrt(dn) || 1;
+  dirVec = dirVec.map(x => x / dn);                          // unit direction of the last A→B travel
+  travelPaused = false;
+  if (driftTimer) { clearInterval(driftTimer); driftTimer = null; } const dc = $("drift"); if (dc) dc.checked = false;   // don't fight drift
+  glideId++; gliding = false;                                // cancel any in-flight glide
+  if (!dirTimer) dirTimer = setInterval(dirTick, DRIFT_MS);
+  dirTick();
+  log("▶ continuing along the last direction");
 }
 
 // Wanderer 2: a simulated scout — wanders the space (red dot + tail) and drops feeling
@@ -1935,6 +1979,17 @@ function renderBreadcrumbs() {
 }
 renderBreadcrumbs();
 setInterval(renderBreadcrumbs, 1000);
+
+// Plain-language "now" readout: the current position described in the nearest vocabulary words
+// (so muted/deaf viewers — and everyone — can read what's playing). aria-live announces changes.
+function updateNowWords() {
+  const el = $("nowWords"); if (!el) return;
+  const w = lastVec ? nearestWords(lastVec, 3) : [];
+  const t = w.length ? "now: " + w.join(" · ") : "";
+  if (el.textContent !== t) el.textContent = t;   // only update on change (don't spam the live region)
+}
+updateNowWords();
+setInterval(updateNowWords, 1500);
 
 // Turn ON slow drift + Wanderer 2 by default, once the cube's PCA map is ready.
 (function startDefaults(n){
