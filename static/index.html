@@ -24,6 +24,13 @@
     --track:.14em;                /* uppercase control-label tracking */
   }
   * { box-sizing:border-box; }
+  /* dark, slim scrollbars — consistent regardless of the viewer's macOS "Show scroll bars" setting */
+  * { scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.22) transparent; }
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.18); border-radius:8px; border:2px solid transparent; background-clip:padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.30); }
+  ::-webkit-scrollbar-corner { background:transparent; }
   body { margin:0; font:15px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
   header { padding:22px 28px; border-bottom:1px solid var(--line); }
   header h1 { margin:0; font-size:20px; font-weight:300; }
@@ -125,6 +132,7 @@
   input[type="checkbox"]:checked { background:var(--accent2,#23c08a); }
   input[type="checkbox"]:checked::after { transform:translateX(15px); background:#fff; }
   /* breadcrumb map: AI + audience feelings pinned to embedding coordinates */
+  /* Live collected position data — raw text at the bottom of the left card. */
   #bcList { max-height:230px; overflow:auto; font-family:ui-monospace,Menlo,monospace; font-size:11px; line-height:1.7; white-space:pre-wrap; word-break:break-word; color:var(--muted); }
   .bcrow { padding:6px 8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:var(--ink-850); }
   .bctag { display:inline-block; font-size:9px; text-transform:uppercase; letter-spacing:.08em; padding:1px 6px; border-radius:999px; margin-right:6px; vertical-align:middle; }
@@ -211,7 +219,7 @@
 </head>
 <body>
 <div class="topbar">
-  <h1>Björk Cube</h1>
+  <h1>Morphing Music Map</h1>
 
   <button id="play" class="tbtn play" title="Play (start continuous stream)" aria-label="Play">
     <svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg>
@@ -250,7 +258,7 @@
       <button id="giStop" class="mini" disabled>■ stop</button>
       <label style="display:flex;align-items:center;gap:6px">BPM <input type="number" id="giBpm" min="50" max="200" value="96" style="width:58px"></label>
       <select id="giPattern" style="background:var(--ink-850);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px;font:inherit">
-        <option value="0">Boom-bap</option><option value="1">Four-on-floor</option><option value="2">16th hats</option><option value="3">Drum &amp; bass</option><option value="4">UK garage</option>
+        <option value="0">Boom-bap</option><option value="1">Four-on-floor</option><option value="2">16th hats</option><option value="3">Drum &amp; bass</option><option value="4" selected>UK garage</option>
       </select>
       <button id="giToPrompt" class="mini" title="bounce this swung loop to a WAV and add it as a Style audio prompt">↗ use as style prompt</button>
       <span id="giStatus" class="hint" style="margin:0"></span>
@@ -314,7 +322,7 @@
     <h2>Wander &amp; navigate</h2>
     <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="drift" checked> slow drift (wander on its own)</label>
     <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="wander2" checked> Wanderer 2</label>
-    <div class="slider" style="margin-bottom:8px"><span class="lab">travel speed</span><input type="range" id="driftSpeed" min="0.2" max="3" step="0.1" value="1"><span class="val" id="driftSpeed_v"></span></div>
+    <div class="slider" style="margin-bottom:8px"><span class="lab">travel speed</span><input type="range" id="driftSpeed" min="0.05" max="5" step="0.05" value="1"><span class="val" id="driftSpeed_v"></span></div>
     <div class="row" style="gap:8px; margin-bottom:8px">
       <input type="text" id="describeBox" placeholder="describe this place… e.g. corporate music but with bass">
       <button id="pinUp" class="mini" title="save a place you like">👍</button>
@@ -332,19 +340,16 @@
     <label class="row" style="gap:8px"><input type="checkbox" id="audOpen"> open audience channel</label>
     <div class="hint" id="audState">channel closed</div>
   </div>
-  <div class="sec2">
-    <h2>Breadcrumb map · words ↔ vectors</h2>
-    <div class="hint" style="margin:0 0 8px">Social interpretations of the style space, accumulating — each phrase pinned to a raw 768-d embedding vector (first 5 values shown).</div>
-    <div id="bcList"></div>
-  </div>
+  <!-- Live collected position data: each phrase pinned to its coordinates (raw text, no box) -->
+  <div class="sec2"><div id="bcList"></div></div>
 </div>
 
 <!-- BOTTOM-RIGHT: Sampling + PCA sliders -->
 <!-- RIGHT: Groove map (top) + Sampling & guidance + PCA explorer (one card) -->
 <div class="ov ov-right">
   <div id="charter" style="flex:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line)">
-    <div style="font-size:72px; font-weight:700; color:var(--text); margin-bottom:10px; line-height:1.04">Music Map</div>
-    <div class="hint" style="margin:0; line-height:1.4; font-size:25px">We make music models more interpretable for musicians and developers by labeling its space using social media methods.</div>
+    <div style="font-size:60px; font-weight:700; color:var(--text); margin-bottom:10px; line-height:1.04">Morphing<br>Music<br>Map</div>
+    <div class="hint" style="margin:0; line-height:1.4; font-size:25px">We make AI-generated music more navigable by using social media methods to crowdsource the mapping of the high-dimensional musical space.</div>
   </div>
   <div class="ov-lower">
   <div class="sec2" id="audQrSec">
@@ -356,6 +361,7 @@
   </div>
   <div class="sec2">
     <h2>Sampling &amp; guidance</h2>
+    <div class="slider"><span class="lab">glitch</span><input type="range" id="glitch" min="0" max="1" step="0.01" value="0"><span class="val" id="glitch_v"></span></div>
     <div class="slider"><span class="lab">temperature</span><input type="range" id="temperature" min="0.1" max="2.5" step="0.05" value="1.3"><span class="val" id="temperature_v"></span></div>
     <div class="slider"><span class="lab">top_k</span><input type="range" id="top_k" min="1" max="256" step="1" value="40"><span class="val" id="top_k_v"></span></div>
     <div class="slider"><span class="lab">cfg · style</span><input type="range" id="cfg_musiccoca" min="-1" max="7" step="0.1" value="3.0"><span class="val" id="cfg_musiccoca_v"></span></div>
@@ -476,13 +482,13 @@ function buildStyleForm() {
 // Tempo + weight sliders: show value + re-embed/steer live as they move.
 { const e = $("tempoBpm"), o = $("tempoBpm_v");
   const u = () => o.textContent = e.value + " bpm";
-  e.addEventListener("input", () => { u(); onStyleChange(); }); u(); }
+  e.addEventListener("input", () => { u(); onStyleChange(); syncSeqFromTempo(); }); u(); }
 { const e = $("tempoWeight"), o = $("tempoWeight_v");
   const u = () => o.textContent = +e.value === 0 ? "off" : Math.round(e.value * 100) + "%";
   e.addEventListener("input", () => { u(); onStyleChange(); }); u(); }
 
 $("addInput").addEventListener("click", () => addInput("text", "", 1));
-addInput("text", "gothic techno", 1);  // start with one input
+addInput("text", "UK garage", 1);  // start with one input
 // Don't let the browser navigate away when an audio file is dropped outside a dropzone.
 ["dragover", "drop"].forEach(ev => document.addEventListener(ev, e => {
   if ([...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files")) e.preventDefault();
@@ -771,7 +777,7 @@ function drawCube() {
   if (vocabPoints && vocabCoords && vocabCoords.length === vocabPoints.length) {
     x.fillStyle = "rgba(150,162,196,.5)";
     for (let i = 0; i < vocabPoints.length; i++) {
-      const p = P(pcaToU(vocabCoords[i])); x.beginPath(); x.arc(p[0], p[1], 2.4, 0, 7); x.fill();
+      const p = P(pcaToU(vocabCoords[i])); x.beginPath(); x.arc(p[0], p[1], 3.2, 0, 7); x.fill();
       cubeDots.push({ px: p[0], py: p[1], name: vocabPoints[i].word, emb: vocabPoints[i].embedding, kind: "vocab" });
     }
   }
@@ -779,7 +785,7 @@ function drawCube() {
   // Preset positions (green).
   x.fillStyle = "rgba(35,192,138,.85)";
   (pcaData.coords || []).forEach((coord, i) => {
-    const p = P(pcaToU(coord)); x.beginPath(); x.arc(p[0], p[1], 3.5, 0, 7); x.fill();
+    const p = P(pcaToU(coord)); x.beginPath(); x.arc(p[0], p[1], 4.5, 0, 7); x.fill();
     const pr = pcaPresets[i];
     if (pr) cubeDots.push({ px: p[0], py: p[1], name: presetLabel(pr), emb: pr.vec, kind: "preset" });
   });
@@ -790,8 +796,8 @@ function drawCube() {
       const bad = landmarks[i].polarity === "bad";
       const p = P(pcaToU(landmarkCoords[i]));
       x.fillStyle = bad ? "rgba(224,101,76,.95)" : "rgba(35,210,154,.95)";
-      x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill();
-      if (bad) { x.strokeStyle = "rgba(224,101,76,.55)"; x.lineWidth = 1; x.beginPath(); x.arc(p[0], p[1], 7.5, 0, 7); x.stroke(); }
+      x.beginPath(); x.arc(p[0], p[1], 5, 0, 7); x.fill();
+      if (bad) { x.strokeStyle = "rgba(224,101,76,.55)"; x.lineWidth = 1; x.beginPath(); x.arc(p[0], p[1], 9, 0, 7); x.stroke(); }
       cubeDots.push({ px: p[0], py: p[1], name: (bad ? "👎 " : "👍 ") + landmarks[i].description, emb: landmarks[i].embedding, kind: "landmark" });
     }
   }
@@ -804,9 +810,9 @@ function drawCube() {
     const co = embToCoords(trailMarks[i].embedding); if (!co) continue;
     const p = P(pcaToU(co));
     x.fillStyle = `rgba(35,210,154,${(0.85 * f).toFixed(2)})`;
-    x.beginPath(); x.arc(p[0], p[1], 3, 0, 7); x.fill();
+    x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill();
     x.fillStyle = `rgba(201,188,255,${(0.8 * f).toFixed(2)})`;
-    x.font = "15px -apple-system,sans-serif"; x.fillText(trailMarks[i].description, p[0] + 5, p[1] + 3);
+    x.font = "18px -apple-system,sans-serif"; x.fillText(trailMarks[i].description, p[0] + 5, p[1] + 3);
     cubeDots.push({ px: p[0], py: p[1], name: "👍 " + trailMarks[i].description, emb: trailMarks[i].embedding, kind: "trail" });
   }
 
@@ -815,9 +821,9 @@ function drawCube() {
     const co = embToCoords(audMarks[i].embedding); if (!co) continue;
     const p = P(pcaToU(co));
     x.fillStyle = "rgba(35,210,154,.9)";
-    x.beginPath(); x.arc(p[0], p[1], 3, 0, 7); x.fill();
+    x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill();
     x.fillStyle = "rgba(201,188,255,.85)";
-    x.font = "15px -apple-system,sans-serif"; x.fillText(audMarks[i].description, p[0] + 5, p[1] + 3);
+    x.font = "18px -apple-system,sans-serif"; x.fillText(audMarks[i].description, p[0] + 5, p[1] + 3);
     cubeDots.push({ px: p[0], py: p[1], name: "👍 " + audMarks[i].description, emb: audMarks[i].embedding, kind: "aud" });
   }
 
@@ -832,8 +838,8 @@ function drawCube() {
     const wc = embToCoords(w2Vec);
     if (wc) { const wp = P(pcaToU(wc));
       x.fillStyle = "#e0654c"; x.strokeStyle = "rgba(224,101,76,.6)"; x.lineWidth = 2;
-      x.beginPath(); x.arc(wp[0], wp[1], 5, 0, 7); x.fill(); x.stroke();
-      x.fillStyle = "rgba(224,101,76,.9)"; x.font = "10px -apple-system,sans-serif"; x.fillText("wanderer 2", wp[0] + 7, wp[1] - 6);
+      x.beginPath(); x.arc(wp[0], wp[1], 6, 0, 7); x.fill(); x.stroke();
+      x.fillStyle = "rgba(224,101,76,.9)"; x.font = "bold 16px -apple-system,sans-serif"; x.fillText("wanderer 2", wp[0] + 7, wp[1] - 6);
       cubeDots.push({ px: wp[0], py: wp[1], name: "wanderer 2", emb: w2Vec.slice(), kind: "wander2" });   // click to travel to the scout
     }
   }
@@ -841,14 +847,14 @@ function drawCube() {
   // Current position (draggable bright dot).
   const pc = P(pcaToU(pcaCoords));
   x.fillStyle = "#fff"; x.strokeStyle = "#23c08a"; x.lineWidth = 2;
-  x.beginPath(); x.arc(pc[0], pc[1], 6, 0, 7); x.fill(); x.stroke();
-  x.fillStyle = "rgba(231,233,238,.95)"; x.font = "10px -apple-system,sans-serif"; x.fillText("Hackspace Hackathon 2026", pc[0] + 10, pc[1] + 3);
+  x.beginPath(); x.arc(pc[0], pc[1], 7.5, 0, 7); x.fill(); x.stroke();
+  x.fillStyle = "rgba(231,233,238,.95)"; x.font = "bold 16px -apple-system,sans-serif"; x.fillText("HACKATHON", pc[0] + 10, pc[1] + 20);
   cubeDots.push({ px: pc[0], py: pc[1], name: "Hackspace Hackathon 2026", emb: null, kind: "current" });
 
 
   // Hover label.
   if (hoverName && hoverXY) {
-    x.font = "12px -apple-system,sans-serif";
+    x.font = "14px -apple-system,sans-serif";
     const tw = x.measureText(hoverName).width;
     const lx = Math.min(hoverXY[0] + 10, w - tw - 12), ly = Math.max(16, hoverXY[1] - 10);
     x.fillStyle = "rgba(0,0,0,.78)"; x.fillRect(lx - 5, ly - 13, tw + 10, 19);
@@ -1010,7 +1016,7 @@ const log = m => { $("log").textContent = String(m).replace(/^[^\p{L}\p{N}(]+/u,
 const setDot = c => { $("dot").className = "dot" + (c ? " " + c : ""); };
 
 { const e = $("driftSpeed"), o = $("driftSpeed_v");
-  const u = () => o.textContent = (+e.value).toFixed(1) + "×";
+  const u = () => o.textContent = (+e.value).toFixed(2) + "×";
   e.addEventListener("input", u); u(); }
 
 // ---- Style-embedding bar chart --------------------------------------------
@@ -1142,7 +1148,8 @@ function waveFrame(t) {
 }
 
 // ---- Web Audio streaming playback -----------------------------------------
-let ctx = null, nextTime = 0, sampleRate = 48000;
+let ctx = null, nextTime = 0, sampleRate = 48000, glitchNode = null, glitch = 0;
+{ const e = $("glitch"), o = $("glitch_v"); if (e) { const u = () => { glitch = +e.value; o.textContent = +e.value === 0 ? "off" : Math.round(e.value * 100) + "%"; }; e.addEventListener("input", u); u(); } }
 let ws = null, playing = false, chunksPlayed = 0;
 let userStop = false, everReady = false, reconnectN = 0;   // auto-reconnect state
 
@@ -1166,6 +1173,26 @@ async function prepareStyle() {
   return await res.json();   // { token, source, embedding, dim, tokens }
 }
 
+// Real-time glitch (bitcrusher: bit-depth + sample-rate reduction), driven by `glitch` 0..1.
+function makeGlitch(c) {
+  const node = c.createScriptProcessor(1024, 2, 2);
+  let phase = 0, hL = 0, hR = 0;
+  node.onaudioprocess = (e) => {
+    const iL = e.inputBuffer.getChannelData(0), iR = e.inputBuffer.getChannelData(1);
+    const oL = e.outputBuffer.getChannelData(0), oR = e.outputBuffer.getChannelData(1);
+    const a = glitch;
+    if (a <= 0.001) { oL.set(iL); oR.set(iR); return; }          // clean passthrough
+    const g = Math.pow(a, 0.3);                                  // very steep curve -> aggressive well before 50%
+    const nf = 1 - g * 0.95;                                     // sample-rate reduction (sample & hold)
+    const steps = Math.pow(2, 16 - g * 14), inv = 1 / steps;     // bit-depth reduction
+    for (let i = 0; i < iL.length; i++) {
+      phase += nf;
+      if (phase >= 1) { phase -= 1; hL = Math.round(iL[i] * steps) * inv; hR = Math.round(iR[i] * steps) * inv; }
+      oL[i] = hL; oR[i] = hR;
+    }
+  };
+  return node;
+}
 function playChunk(arrayBuf) {
   const f32 = new Float32Array(arrayBuf);   // interleaved stereo
   const frames = f32.length / 2;
@@ -1173,7 +1200,7 @@ function playChunk(arrayBuf) {
   const L = buf.getChannelData(0), R = buf.getChannelData(1);
   for (let i = 0; i < frames; i++) { L[i] = f32[2*i]; R[i] = f32[2*i+1]; }
   const src = ctx.createBufferSource();
-  src.buffer = buf; src.connect(ctx.destination);
+  src.buffer = buf; src.connect(glitchNode || ctx.destination);
   // If the schedule fell behind the playhead, the buffer starved -> a gap occurred.
   let under = false;
   if (nextTime < ctx.currentTime + 0.02) { under = true; nextTime = ctx.currentTime + 0.05; }
@@ -1207,6 +1234,7 @@ async function start(seed) {
   try { if (ctx) ctx.close(); } catch {}
   ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
   await ctx.resume();
+  glitchNode = makeGlitch(ctx); glitchNode.connect(ctx.destination);   // route playback through the real-time glitch FX
   nextTime = ctx.currentTime;
   chunksPlayed = 0;
   waveReset();
@@ -1237,7 +1265,7 @@ async function start(seed) {
 // model stays loaded, so silently re-establish the stream with a short backoff.
 function scheduleReconnect() {
   playing = false;
-  try { if (ctx) ctx.close(); } catch {} ctx = null;
+  try { if (ctx) ctx.close(); } catch {} ctx = null; glitchNode = null;
   try { if (ws) ws.close(); } catch {} ws = null;
   if (userStop) return;
   if (++reconnectN > 10) {
@@ -1265,7 +1293,7 @@ function stop() {
   userStop = true;          // user-initiated -> do NOT auto-reconnect
   playing = false; reconnectN = 0;
   if (ws) { try { ws.send(JSON.stringify({ type: "stop" })); } catch {} try { ws.close(); } catch {} ws = null; }
-  if (ctx) { try { ctx.close(); } catch {} ctx = null; }
+  if (ctx) { try { ctx.close(); } catch {} ctx = null; glitchNode = null; }
   setDot("");
   $("play").disabled = false; $("pause").disabled = true;
   $("perf").textContent = "";
@@ -1281,7 +1309,7 @@ sliders.forEach(id => $(id).addEventListener("change", () => {
 }));
 
 // ---- Step sequencer: note + drum onsets that natively condition MRT2 (seq -> /stream) ----
-const SEQ_PITCHES = (() => { const scale=[0,2,4,5,7,9,11], out=[]; for(let oct=4;oct<=5;oct++) for(const s of scale) out.push(12*oct+12+s); out.push(84); return out.reverse(); })();  // C4..C6, C-major, highest row first
+const SEQ_PITCHES = (() => { const scale=[0,2,4,5,7,9,11], out=[]; for(let oct=1;oct<=4;oct++) for(const s of scale) out.push(12*oct+12+s); out.push(72); return out.reverse(); })();  // C1..C5, C-major, highest row first
 let seqSteps=16, seqRate=4, seqNotes=[], seqDrums=[], heldNotes=new Set();   // heldNotes = MIDI keys down now
 function seqInit(){ seqNotes=Array.from({length:seqSteps},()=>new Set()); seqDrums=Array(seqSteps).fill(0); }
 seqInit();
@@ -1291,14 +1319,13 @@ function seqCell(s,on,drum){ const beat=s%4===0; const bg=on?(drum?"#e0795a":"va
 function buildSeqGrid(){
   const g=$("seqGrid"); g.innerHTML=""; const NN=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
   const tbl=document.createElement("div"); tbl.style.cssText="display:inline-block;font-size:0";
-  const drow=document.createElement("div"); drow.style.cssText="white-space:nowrap;margin-bottom:4px";   // drum row on top
+  const drow=document.createElement("div"); drow.style.cssText="white-space:nowrap;margin-top:4px";   // drum row at the bottom
   const dlab=document.createElement("span"); dlab.textContent="drums"; dlab.style.cssText="display:inline-block;width:34px;font-size:10px;color:#e0795a;text-align:right;padding-right:4px;vertical-align:middle";
   drow.appendChild(dlab);
   for(let s=0;s<seqSteps;s++){ const c=document.createElement("span"); c.className="seqcell"; c.dataset.s=s;
     c.style.cssText=seqCell(s,seqDrums[s],true);
     c.addEventListener("click",()=>{ seqDrums[s]=seqDrums[s]?0:1; c.style.cssText=seqCell(s,seqDrums[s],true); pushSeq(); });
     drow.appendChild(c); }
-  tbl.appendChild(drow);
   SEQ_PITCHES.forEach(midi=>{
     const row=document.createElement("div"); row.style.whiteSpace="nowrap";
     const lab=document.createElement("span"); lab.textContent=NN[midi%12]+(Math.floor(midi/12)-1);
@@ -1311,6 +1338,7 @@ function buildSeqGrid(){
       row.appendChild(c); }
     tbl.appendChild(row);
   });
+  tbl.appendChild(drow);   // drums at the bottom
   g.appendChild(tbl);
 }
 function seqHighlight(i){ document.querySelectorAll("#seqGrid .seqcell").forEach(c=>{ c.style.outline = (+c.dataset.s===i) ? "1px solid rgba(255,255,255,.65)" : "none"; }); }
@@ -1320,9 +1348,20 @@ $("seqSteps").addEventListener("change",e=>{ seqSteps=+e.target.value; seqInit()
 // The server error-diffuses it to integer frames, so the AVERAGE tempo is exactly this bpm
 // (with <=~20ms per-step jitter, unavoidable on the 25fps grid).
 function seqSetBpm(bpm){ seqRate=375/bpm; $("seqBpm_v").textContent=`${bpm} bpm · ${Math.round(seqRate*40)}ms/step avg`; }
-$("seqBpm").addEventListener("input",e=>{ $("seqBpmN").value=e.target.value; seqSetBpm(+e.target.value); });
+// Keep the top-left "tempo (bpm)", the sequencer bpm, and the Groove instrument bpm
+// all in lockstep (any one drives the others). Setters only write values — no event
+// dispatch — so there's no feedback loop.
+function _setGiBpm(v){ const g=$("giBpm"); if(g) g.value=Math.max(50,Math.min(200,Math.round(v))); }
+function syncTempoFromSeq(bpm){ const t=$("tempoBpm"); if(t){ t.value=bpm; $("tempoBpm_v").textContent=t.value+" bpm"; } _setGiBpm(bpm); onStyleChange(); }
+function syncSeqFromTempo(){ const v=+$("tempoBpm").value; $("seqBpm").value=v; $("seqBpmN").value=v; seqSetBpm(v); _setGiBpm(v); pushSeq(); }
+// Groove instrument bpm changed -> push to the top-left tempo + the sequencer.
+function syncFromGi(){ const v=Math.max(40,Math.min(200,Math.round(+$("giBpm").value||96)));
+  const t=$("tempoBpm"); if(t){ t.value=v; $("tempoBpm_v").textContent=t.value+" bpm"; }
+  $("seqBpm").value=v; $("seqBpmN").value=v; seqSetBpm(v); onStyleChange(); pushSeq(); }
+$("giBpm").addEventListener("input", syncFromGi);
+$("seqBpm").addEventListener("input",e=>{ $("seqBpmN").value=e.target.value; seqSetBpm(+e.target.value); syncTempoFromSeq(+e.target.value); });
 $("seqBpm").addEventListener("change",pushSeq);
-$("seqBpmN").addEventListener("input",e=>{ const v=Math.max(40,Math.min(200,Math.round(+e.target.value||94))); $("seqBpm").value=v; seqSetBpm(v); });
+$("seqBpmN").addEventListener("input",e=>{ const v=Math.max(40,Math.min(200,Math.round(+e.target.value||94))); $("seqBpm").value=v; seqSetBpm(v); syncTempoFromSeq(v); });
 $("seqBpmN").addEventListener("change",pushSeq);
 $("seqClear").addEventListener("click",()=>{ seqInit(); buildSeqGrid(); pushSeq(); });
 // Bottom dock: one segmented bar toggles the Step sequencer / Groove instrument (one open at a time).
@@ -1339,6 +1378,7 @@ function dockShow(which) {
 $("dockSeq").addEventListener("click", () => dockShow("seq"));
 $("dockGi").addEventListener("click", () => dockShow("gi"));
 seqSetBpm(+$("seqBpm").value);
+syncTempoFromSeq(+$("seqBpm").value);   // top-left tempo matches the sequencer bpm on load
 buildSeqGrid();
 
 // ---- MIDI input (Web MIDI): play a keyboard to step-record into the sequencer ----
@@ -1372,9 +1412,10 @@ function midiNoteOn(m) {
 }
 function midiNoteOff(m) { heldNotes.delete(snapToGrid(m)); buildSeqGrid(); updateHeldHint(); sendLiveNotes(); }
 // Faders (CC) -> Style prompt weights. CC73->prompt 1, 75->2, 79->3, 72->4.
-const FADER_CC = { 82: 0, 83: 1, 85: 2, 17: 3 };   // CC -> Style prompt index (weight)
-const CC_SLIDER = { 74: "driftSpeed" };            // CC -> a fixed slider id (74 = travel speed)
+const FADER_CC = { 82: 0, 83: 1, 85: 2 };          // CC -> Style prompt index (weight); CC17 is now the A→B crossfader
+const CC_SLIDER = { 1: "glitch", 74: "driftSpeed" };   // CC -> a fixed slider id (CC1 = glitch, CC74 = travel speed)
 function midiCC(cc, val) {
+  if (cc === 17) { slideTo(val / 127); return; }   // CC17: crossfade point A -> point B (last clicked dot)
   let el = null;
   if (CC_SLIDER[cc]) el = $(CC_SLIDER[cc]);
   else if (FADER_CC[cc] !== undefined) el = document.querySelectorAll('#inputs input[data-w]')[FADER_CC[cc]];
@@ -1409,6 +1450,20 @@ function gotoNearestDot() {
   }
   if (best) { log("→ nearest: " + best.name); glideToEmbedding(best.emb); }
 }
+// Travel to the geometric FURTHEST corner of the cube box from the current position.
+function gotoFurthestPoint() {
+  if (!pcaData || !pcaData.k) return;
+  const K = cubeDimEff || pcaData.k, c = new Array(pcaData.k).fill(0);
+  for (let k = 0; k < K; k++) { const [lo, hi] = pcaData.ranges[k]; const cur = pcaCoords[k] || 0; c[k] = (Math.abs(lo - cur) >= Math.abs(hi - cur)) ? lo : hi; }
+  const emb = coordsToEmb(c); if (emb) { log("→ furthest point"); glideToEmbedding(emb); }
+}
+// Travel to a RANDOM point inside the cube box.
+function gotoRandomPoint() {
+  if (!pcaData || !pcaData.k) return;
+  const K = cubeDimEff || pcaData.k, c = new Array(pcaData.k).fill(0);
+  for (let k = 0; k < K; k++) { const [lo, hi] = pcaData.ranges[k]; c[k] = lo + Math.random() * (hi - lo); }
+  const emb = coordsToEmb(c); if (emb) { log("→ random point"); glideToEmbedding(emb); }
+}
 function onMIDI(ev) {
   const b0 = ev.data[0], b1 = ev.data[1], b2 = ev.data[2], cmd = b0 & 0xf0, ch = (b0 & 0x0f) + 1;
   _lastMidi = "[" + b0.toString(16) + " " + b1 + " " + b2 + "] ch" + ch
@@ -1421,7 +1476,11 @@ function onMIDI(ev) {
   if (ch === 10) {                                      // ch10 pads -> one pulse per press (edge-triggered)
     if (noteOn && !_ch10Down.has(b1)) {
       _ch10Down.add(b1);
-      if (b1 === 40) pauseTravel(); else if (b1 === 41) resumeTravel(); else gotoNearestDot();
+      if (b1 === 36) gotoNearestDot();
+      else if (b1 === 37) gotoFurthestPoint();
+      else if (b1 === 38) gotoRandomPoint();
+      else if (b1 === 40) pauseTravel();
+      else if (b1 === 41) resumeTravel();
     } else if (noteOff) _ch10Down.delete(b1);
   }
   else if (ch === 1) {                                  // grid (notes) -> channel 1 only
@@ -1598,6 +1657,7 @@ $("describeBox").addEventListener("keydown", e => { if (e.key === "Enter") pin("
 
 // Smoothly travel from the current embedding to the target over a few seconds.
 let glideId = 0, gliding = false, travelPaused = false;
+let slideA = null, slideB = null, _slideTimer = null, _slideNext = null;   // CC17 A→B crossfader
 const travelSpeed = () => (+$("driftSpeed").value || 1);   // one slider scales ALL travel (drift + glides)
 const _sleep = ms => new Promise(r => setTimeout(r, ms));
 const _lerp = (a, b, t) => { const o = new Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] + (b[i] - a[i]) * t; return o; };
@@ -1608,6 +1668,7 @@ function applyNavFinal(j) {
 async function glideTo(j) {
   if (travelPaused) return;
   const target = j.embedding, start = lastVec ? lastVec.slice() : null;
+  slideA = start; slideB = target ? target.slice() : null;   // destination becomes point B (CC17 crossfades A->B)
   const myId = ++glideId; gliding = true;   // pauses drift while traveling
   try {
     if (!start) { applyNavFinal(j); return; }   // no current point -> jump
@@ -1627,6 +1688,7 @@ async function glideTo(j) {
 async function glideToEmbedding(target) {
   if (travelPaused) return;
   const start = lastVec ? lastVec.slice() : null;
+  slideA = start; slideB = target ? target.slice() : null;   // destination becomes point B (CC17 crossfades A->B)
   const myId = ++glideId; gliding = true;
   try {
     if (!start) { await applyRawEmbedding(target); return; }
@@ -1637,6 +1699,21 @@ async function glideToEmbedding(target) {
       await _sleep(340 / travelSpeed());
     }
   } finally { if (glideId === myId) gliding = false; }
+}
+
+// CC17 crossfader: slide between point A (where you were) and point B (last clicked dot).
+function slideTo(t) {
+  if (!slideA || !slideB) return;
+  _slideNext = Math.max(0, Math.min(1, t));
+  if (_slideTimer) return;
+  const apply = () => {
+    if (_slideNext == null) { _slideTimer = null; return; }
+    const tt = _slideNext; _slideNext = null;
+    glideId++; gliding = false;                      // cancel any auto-glide so the manual scrub wins
+    applyRawEmbedding(_lerp(slideA, slideB, tt));
+    _slideTimer = setTimeout(apply, 70);             // throttle the /prepare_raw calls
+  };
+  apply();
 }
 
 // Navigate by feeling -> Claude picks an action -> glide to the target embedding.
@@ -1920,7 +1997,7 @@ fitGroove(); setTimeout(fitGroove, 300);
     {name:'★ ghost funk',timing:[0,0,4,0,0,0,4,0,0,0,4,0,0,0,4,0],velocity:mkv([[0,1.2],[4,1.2],[8,1.2],[12,1.2],[1,.35],[3,.4],[5,.35],[7,.4],[9,.35],[11,.4],[13,.35],[15,.4]])},
     {name:'★ crescendo',timing:ZERO.slice(),velocity:Array.from({length:SLOTS},(_,i)=>0.5+i/(SLOTS-1))},
   ];
-  let grooves=[], pca=null, cur=[], patIdx=0, playSlot=0, override=null;
+  let grooves=[], pca=null, cur=[], patIdx=4, playSlot=0, override=null;
   const vecOf=g=>g.timing.concat(g.velocity.map(v=>v*VEL_SCALE));
 
   async function load(){
