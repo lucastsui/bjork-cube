@@ -42,21 +42,19 @@
             calc(48px + env(safe-area-inset-bottom))
             max(18px,env(safe-area-inset-left));
   }
-  header{ margin-bottom:6px; }
+  header{ margin-bottom:20px; display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
   .brand{
     margin:0 0 5px; font-size:11px; font-weight:500;
     text-transform:uppercase; letter-spacing:.2em; color:var(--muted);
   }
   h1{ margin:0; font-size:23px; font-weight:300; letter-spacing:.01em; }
 
-  /* ── live / closed banner ── */
+  /* ── live / not-live status: top-right, aligned with the title, no box ── */
   .banner{
-    margin:18px 0 22px; padding:12px 15px; border-radius:12px;
-    font-size:14px; border:1px solid var(--line);
-    display:flex; align-items:center; gap:10px;
-    transition:color .2s, border-color .2s, background .2s;
+    font-size:13px; display:flex; align-items:center; gap:7px;
+    white-space:nowrap; flex:none; transition:color .2s;
   }
-  .banner.live{ color:var(--accent); border-color:rgba(35,192,138,.42); background:var(--accent-dim); }
+  .banner.live{ color:var(--accent); }
   .banner.closed{ color:var(--muted); }
   .dot{
     width:9px; height:9px; border-radius:50%; flex:none;
@@ -127,19 +125,18 @@
 <body class="closed">
   <div class="wrap">
     <header>
-      <p class="brand">Björk Cube</p>
-      <h1>Chart the Hyper Space!</h1>
+      <div>
+        <p class="brand">Björk Cube</p>
+        <h1>Say anything you like, we'll handle the rest (or don't).</h1>
+      </div>
+      <div class="banner closed" id="banner" role="status" aria-live="polite">not live</div>
     </header>
-
-    <div class="banner closed" id="banner" role="status" aria-live="polite">
-      the demo channel is closed right now
-    </div>
 
     <!-- Q1 — FEELING -> /audience/feel (breadcrumb on the cube) -->
     <section class="card" id="cardFeel">
       <h2>The music NOW feels…</h2>
       <input class="field" id="feelInput" type="text" maxlength="40"
-             placeholder="a feeling, in a word or two…"
+             placeholder="genre/instrument/feeling/anything"
              autocomplete="off" autocapitalize="none" autocorrect="off"
              spellcheck="false" enterkeyhint="send" inputmode="text" disabled>
       <div class="cardfoot">
@@ -154,7 +151,7 @@
     <section class="card" id="cardSay">
       <h2>Steer the course!</h2>
       <textarea class="field" id="sayInput" maxlength="80" rows="2"
-                placeholder="e.g. lighter, blast the bass, get crazy…"
+                placeholder='"get wilder", "drop the bass", …'
                 autocomplete="off" spellcheck="false" disabled></textarea>
       <div class="cardfoot">
         <span class="count" id="sayCount">0/80</span>
@@ -173,6 +170,10 @@
 
     var channelOpen = null;            // null = unknown until first status poll
     var banner = $("banner");
+
+    // Stable per-device id (not per-IP) so phones sharing a network/NAT each get their own rate bucket.
+    var deviceId = localStorage.getItem("aud_dev");
+    if(!deviceId){ deviceId = "d" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("aud_dev", deviceId); }
 
     // Each card: its OWN field + OWN Send button, posted INDIVIDUALLY.
     var feel = { input:$("feelInput"), send:$("feelSend"), msg:$("feelMsg"),
@@ -199,10 +200,10 @@
       });
       if(open){
         banner.className = "banner live";
-        banner.innerHTML = '<span class="dot"></span><span>live — share your vibe</span>';
+        banner.innerHTML = '<span class="dot"></span><span>live</span>';
       } else {
         banner.className = "banner closed";
-        banner.textContent = "the demo channel is closed right now";
+        banner.textContent = "not live";
       }
     }
 
@@ -231,7 +232,7 @@
       fetch(c.path, {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ text: text })
+        body: JSON.stringify({ text: text, device: deviceId })
       }).then(function(r){
         if(r.status === 200){
           c.input.value = "";

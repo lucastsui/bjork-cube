@@ -142,11 +142,14 @@ async def _aud_post(request: Request, kind: str, cap: int):
     clean = _aud_clean(data.get("text", ""), cap)
     if not clean:
         return JSONResponse({"error": "empty"}, status_code=400)
-    ip = request.client.host if request.client else "?"
+    # Per-DEVICE rate limit (not per-IP, so phones behind one network/NAT don't
+    # throttle each other), with a SEPARATE 2.5s timer per question (kind).
+    dev = str(data.get("device") or "").strip() or (request.client.host if request.client else "?")
+    key = dev + ":" + kind
     now = time.time()
-    if now - _aud_rate.get(ip, 0) < 2.5:
+    if now - _aud_rate.get(key, 0) < 2.5:
         return JSONResponse({"error": "slow down"}, status_code=429)
-    _aud_rate[ip] = now
+    _aud_rate[key] = now
     _aud_broadcast({"type": kind, "text": clean})
     return {"ok": True}
 

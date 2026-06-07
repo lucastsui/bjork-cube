@@ -162,6 +162,7 @@
   .ov { position:fixed; z-index:10; width:340px; overflow:auto; background:rgba(24,27,34,.93); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
   .ov h2 { margin:0 0 12px; font-size:13px; font-weight:500; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
   .ov .sec2 { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .ov-lower > .sec2:first-child { margin-top:0; padding-top:0; border-top:0; }   /* charter divider already separates it */
   .ovhead { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
   .ovhead .caret { color:var(--muted); font-size:12px; }
   #seqBody { margin-top:12px; }
@@ -343,11 +344,10 @@
 <div class="ov ov-right">
   <div id="charter" style="flex:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line)">
     <div style="font-size:72px; font-weight:700; color:var(--text); margin-bottom:10px; line-height:1.04">Music Map</div>
-    <div class="hint" style="margin:0; line-height:1.4; font-size:25px">We make music models more valuable for musicians and developers by labeling its space through social media.</div>
+    <div class="hint" style="margin:0; line-height:1.4; font-size:25px">We make music models more interpretable for musicians and developers by labeling its space using social media methods.</div>
   </div>
   <div class="ov-lower">
   <div class="sec2" id="audQrSec">
-    <h2>Audience — scan to join</h2>
     <img id="audQr" src="/m_qr" alt="scan to join the audience app" style="display:block; width:160px; height:160px; background:#fff; border-radius:8px; padding:6px; margin:2px auto 8px">
   </div>
   <div id="groovePanel" class="sec2 gcol">
