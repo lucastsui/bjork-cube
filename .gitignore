@@ -27,3 +27,6 @@ tempo_refs/
 
 # Scratch bounce demos
 groove-swing-*.wav
+
+*.zip
+agr_txt/*.agr

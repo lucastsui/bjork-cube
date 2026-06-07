@@ -67,6 +67,7 @@
   .wwrap input[type=range] { flex:1; }
   .wwrap .wv { width:40px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text); letter-spacing:0; }
   .xbtn { width:32px; height:32px; flex:none; padding:0; font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .pcard .xbtn { border:none; background:transparent; }   /* preset delete: borderless clean × */
   .fname { font-size:13px; color:var(--text); }
   .pcard { display:flex; align-items:center; gap:12px; background:var(--ink-850); border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
   .pcard:hover { border-color:var(--accent2); }
@@ -107,6 +108,11 @@
   .chip.bad:hover { border-color:var(--coral-500); }
   .mini { padding:7px 14px; border:1px solid var(--stroke-dim); border-radius:8px; background:var(--ink-850); color:var(--muted); cursor:pointer; font:inherit; font-size:13px; transition:border-color .15s,color .15s; }
   .mini:hover { color:var(--text); border-color:var(--accent2); }
+  /* checkboxes -> sliding toggle switches */
+  input[type="checkbox"] { -webkit-appearance:none; appearance:none; flex:none; position:relative; width:34px; height:19px; margin:0; border-radius:999px; background:rgba(255,255,255,.16); cursor:pointer; vertical-align:middle; transition:background .15s; }
+  input[type="checkbox"]::after { content:""; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background:#e7e9ee; transition:transform .15s; }
+  input[type="checkbox"]:checked { background:var(--accent2,#23c08a); }
+  input[type="checkbox"]:checked::after { transform:translateX(15px); background:#fff; }
   .seq { transition:opacity .15s; }
   .roll, .drum { display:grid; gap:2px; }
   .cell { height:13px; background:var(--ink-850); border-radius:2px; cursor:pointer; }
@@ -229,21 +235,20 @@
       <button id="seqClear" class="mini">clear</button>
       <span id="seqHint" class="hint" style="margin:0">off · style-only</span>
     </div>
-    <div class="row" style="gap:16px; margin:0 0 8px; flex-wrap:wrap; align-items:center">
-      <div class="slider" style="flex:1; min-width:160px"><span class="lab">cfg · notes</span><input type="range" id="cfg_notes" min="-1" max="7" step="0.1" value="7"><span class="val" id="cfg_notes_v"></span></div>
-      <div class="slider" style="flex:1; min-width:160px"><span class="lab">cfg · drums</span><input type="range" id="cfg_drums" min="-1" max="7" step="1" value="7"><span class="val" id="cfg_drums_v"></span></div>
-    </div>
-    <div id="seqGrid" style="overflow:auto; max-height:calc(50vh - 190px)"></div>
+    <div id="seqGrid" style="overflow:auto; max-height:calc(50vh - 150px)"></div>
   </div>
 </div>
 
 <!-- TEMP: MIDI CC monitor (testing) — remove later -->
-<div id="midiMon" style="position:fixed; top:62px; right:16px; z-index:60; background:rgba(0,0,0,.82); color:#23d29a; font:12px ui-monospace,Menlo,monospace; padding:10px 14px; border:1px solid #23c08a; border-radius:10px; max-height:70vh; overflow:auto; pointer-events:none; white-space:pre; min-width:180px; box-shadow:0 8px 28px rgba(0,0,0,.5)">MIDI monitor (testing) — wiggle a knob/fader…</div>
+<div id="midiMon" style="position:fixed; top:62px; right:354px; z-index:60; font:12px ui-monospace,Menlo,monospace; text-align:right; pointer-events:none">
+  <span id="midiMonTog" title="MIDI monitor" style="display:inline-block; cursor:pointer; pointer-events:auto; user-select:none; background:rgba(0,0,0,.82); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:0 9px; font-size:15px; line-height:20px">−</span>
+  <pre id="midiMonBody" style="display:none; margin:4px 0 0; text-align:left; background:rgba(0,0,0,.82); color:var(--text); padding:10px 14px; border:1px solid var(--line); border-radius:10px; max-height:70vh; overflow:auto; white-space:pre; min-width:180px; box-shadow:0 8px 28px rgba(0,0,0,.5); pointer-events:auto">MIDI monitor — wiggle a knob…</pre>
+</div>
 
 <!-- LEFT: Style + Ingredients + Presets + Wander & navigate (one pane) -->
 <div class="ov ov-left">
   <div class="slider" style="margin:2px 0 6px"><span class="lab">tempo (bpm)</span><input type="range" id="tempoBpm" min="50" max="200" step="1" value="120"><span class="val" id="tempoBpm_v"></span></div>
-  <div class="slider" style="margin:0 0 14px"><span class="lab">tempo weight</span><input type="range" id="tempoWeight" min="0" max="1" step="0.05" value="0.3"><span class="val" id="tempoWeight_v"></span></div>
+  <div class="slider" style="margin:0 0 14px"><span class="lab">tempo weight</span><input type="range" id="tempoWeight" min="0" max="1" step="0.05" value="0"><span class="val" id="tempoWeight_v"></span></div>
   <div id="stylePanel">
     <h2>Style — mix prompts &amp; audio</h2>
     <div id="inputs"></div>
@@ -291,16 +296,11 @@
   <div class="ov-lower">
   <div class="sec2">
     <h2>Sampling &amp; guidance</h2>
-    <div class="grid2">
-      <div>
-        <div class="slider"><span class="lab">temperature</span><input type="range" id="temperature" min="0.1" max="2.5" step="0.05" value="1.3"><span class="val" id="temperature_v"></span></div>
-        <div class="slider"><span class="lab">top_k</span><input type="range" id="top_k" min="1" max="256" step="1" value="40"><span class="val" id="top_k_v"></span></div>
-      </div>
-      <div>
-        <div class="slider"><span class="lab">cfg · style</span><input type="range" id="cfg_musiccoca" min="-1" max="7" step="0.1" value="3.0"><span class="val" id="cfg_musiccoca_v"></span></div>
-      </div>
-    </div>
-    <div class="hint">CFG = how strictly the model obeys each condition. Higher → more literal, lower → freer.</div>
+    <div class="slider"><span class="lab">temperature</span><input type="range" id="temperature" min="0.1" max="2.5" step="0.05" value="1.3"><span class="val" id="temperature_v"></span></div>
+    <div class="slider"><span class="lab">top_k</span><input type="range" id="top_k" min="1" max="256" step="1" value="40"><span class="val" id="top_k_v"></span></div>
+    <div class="slider"><span class="lab">cfg · style</span><input type="range" id="cfg_musiccoca" min="-1" max="7" step="0.1" value="3.0"><span class="val" id="cfg_musiccoca_v"></span></div>
+    <div class="slider"><span class="lab">cfg · notes</span><input type="range" id="cfg_notes" min="-1" max="7" step="0.1" value="7"><span class="val" id="cfg_notes_v"></span></div>
+    <div class="slider"><span class="lab">cfg · drums</span><input type="range" id="cfg_drums" min="-1" max="7" step="1" value="7"><span class="val" id="cfg_drums_v"></span></div>
   </div>
   <div class="sec2">
     <h2>PCA explorer</h2>
@@ -744,7 +744,7 @@ function drawCube() {
     x.fillStyle = `rgba(35,210,154,${(0.85 * f).toFixed(2)})`;
     x.beginPath(); x.arc(p[0], p[1], 3, 0, 7); x.fill();
     x.fillStyle = `rgba(201,188,255,${(0.8 * f).toFixed(2)})`;
-    x.font = "10px -apple-system,sans-serif"; x.fillText(trailMarks[i].description, p[0] + 5, p[1] + 3);
+    x.font = "15px -apple-system,sans-serif"; x.fillText(trailMarks[i].description, p[0] + 5, p[1] + 3);
     cubeDots.push({ px: p[0], py: p[1], name: "👍 " + trailMarks[i].description, emb: trailMarks[i].embedding, kind: "trail" });
   }
 
@@ -761,6 +761,7 @@ function drawCube() {
       x.fillStyle = "#e0654c"; x.strokeStyle = "rgba(224,101,76,.6)"; x.lineWidth = 2;
       x.beginPath(); x.arc(wp[0], wp[1], 5, 0, 7); x.fill(); x.stroke();
       x.fillStyle = "rgba(224,101,76,.9)"; x.font = "10px -apple-system,sans-serif"; x.fillText("wanderer 2", wp[0] + 7, wp[1] - 6);
+      cubeDots.push({ px: wp[0], py: wp[1], name: "wanderer 2", emb: w2Vec.slice(), kind: "wander2" });   // click to travel to the scout
     }
   }
 
@@ -931,7 +932,7 @@ async function applyPca() {
 
 renderPresets();
 
-const log = m => { $("log").textContent = m; };
+const log = m => { $("log").textContent = String(m).replace(/^[^\p{L}\p{N}(]+/u, ""); };   // drop any leading emoji/symbol
 const setDot = c => { $("dot").className = "dot" + (c ? " " + c : ""); };
 
 { const e = $("driftSpeed"), o = $("driftSpeed_v");
@@ -1299,10 +1300,15 @@ function midiCC(cc, val) {
 // TEMP: live MIDI monitor (top-right) — shows every CC + its latest value.
 let _ccSeen = {}, _lastMidi = "";
 function renderMidiMon() {
-  const el = $("midiMon"); if (!el) return;
+  const el = $("midiMonBody"); if (!el) return;
   const ccs = Object.keys(_ccSeen).map(Number).sort((a, b) => a - b);
-  el.textContent = "MIDI monitor (testing)\nlast: " + (_lastMidi || "—") + "\n\n"
+  el.textContent = "MIDI monitor\nlast: " + (_lastMidi || "—") + "\n\n"
     + (ccs.length ? ccs.map(c => "CC " + c + " : " + _ccSeen[c]).join("\n") : "(wiggle a knob/fader)");
+}
+{ const t = $("midiMonTog"); if (t) t.addEventListener("click", () => {
+    const b = $("midiMonBody"), open = b.style.display === "none";
+    b.style.display = open ? "block" : "none"; t.textContent = open ? "×" : "−";   // collapsed shows only "−"
+  });
 }
 let _ch10Down = new Set();   // ch10 pads currently held -> edge-trigger so each press = one pulse
 // Jump the current position to the nearest defined dot (preset/vocab/landmark) on the cube.
