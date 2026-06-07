@@ -237,6 +237,9 @@
   </div>
 </div>
 
+<!-- TEMP: MIDI CC monitor (testing) — remove later -->
+<div id="midiMon" style="position:fixed; top:62px; right:16px; z-index:60; background:rgba(0,0,0,.82); color:#23d29a; font:12px ui-monospace,Menlo,monospace; padding:10px 14px; border:1px solid #23c08a; border-radius:10px; max-height:70vh; overflow:auto; pointer-events:none; white-space:pre; min-width:180px; box-shadow:0 8px 28px rgba(0,0,0,.5)">MIDI monitor (testing) — wiggle a knob/fader…</div>
+
 <!-- LEFT: Style + Ingredients + Presets + Wander & navigate (one pane) -->
 <div class="ov ov-left">
   <div class="slider" style="margin:2px 0 6px"><span class="lab">tempo (bpm)</span><input type="range" id="tempoBpm" min="50" max="200" step="1" value="120"><span class="val" id="tempoBpm_v"></span></div>
@@ -262,6 +265,7 @@
   <div class="sec2">
     <h2>Wander &amp; navigate</h2>
     <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="drift"> slow drift (wander on its own)</label>
+    <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="wander2"> Wanderer 2</label>
     <div class="slider" style="margin-bottom:8px"><span class="lab">travel speed</span><input type="range" id="driftSpeed" min="0.2" max="3" step="0.1" value="1"><span class="val" id="driftSpeed_v"></span></div>
     <div class="row" style="gap:8px; margin-bottom:8px">
       <input type="text" id="describeBox" placeholder="describe this place… e.g. corporate music but with bass">
@@ -365,7 +369,7 @@ function createRow(inp) {
   const wWrap = document.createElement("div"); wWrap.className = "wwrap";
   const wlab = document.createElement("span"); wlab.textContent = "w";
   const wr = document.createElement("input");
-  wr.type = "range"; wr.min = "0"; wr.max = "2"; wr.step = "0.05"; wr.value = inp.weight;
+  wr.type = "range"; wr.min = "0"; wr.max = "2"; wr.step = "0.05"; wr.value = inp.weight; wr.dataset.w = "1";   // tagged so MIDI faders can drive prompt weights
   const wv = document.createElement("span"); wv.className = "wv"; wv.textContent = (+inp.weight).toFixed(2);
   wr.addEventListener("input", () => { inp.weight = +wr.value; wv.textContent = (+wr.value).toFixed(2); onStyleChange(); });
   wWrap.append(wlab, wr, wv);
@@ -523,7 +527,7 @@ $("luckyBtn").addEventListener("click", feelingLucky);
 // usable immediately (needs >=2 presets). Runs once; presets aren't persisted.
 const DEFAULT_PRESETS = ["gothic techno", "warm ambient pads", "aggressive drum and bass",
   "dreamy synthwave", "lo-fi jazzy hip hop", "epic cinematic orchestral",
-  "funky disco groove", "dark industrial"];
+  "funky disco groove"];
 async function loadDefaultPresets() {
   if (presets.length) return;
   $("presetsHint").textContent = "loading a few starter presets…";
@@ -564,6 +568,8 @@ let cubeDots = [], hoverName = null, hoverXY = null, vocabPoints = null, vocabCo
 const CUBE_DIM_MAX = 12;
 let cubeDim = CUBE_DIM_MAX, cubeDimEff = 0;   // how many principal dims the cube shows (slider 1..12, clamped to k)
 let landmarks = [], landmarkCoords = [];      // pins (good/bad) + their PCA coords, for cube dots
+let trailMarks = [], trailBusy = false;       // non-persistent "feeling" breadcrumbs dropped while wandering
+let w2On = false, w2Vec = null, w2Vel = null, w2Trail = [], w2Timer = null;   // Wanderer 2 (simulated scout, red)
 function presetLabel(p) { return ((p.items || []).map(it => it.type === "audio" ? (it.fname || "audio") : (it.text || "(empty)")).join(" + ")) || "preset"; }
 async function ensureVocabPoints() {
   if (!vocabPoints) { try { const r = await fetch("/vocab_points"); if (r.ok) vocabPoints = (await r.json()).points; } catch (e) {} }
@@ -587,6 +593,12 @@ function computeLandmarkCoords() {
     for (let k = 0; k < pcaData.k; k++) { let d = 0; const c = comps[k]; for (let i = 0; i < emb.length; i++) d += c[i] * (emb[i] - mean[i]); out[k] = d; }
     return out;
   });
+}
+function embToCoords(emb) {   // project a 768-d embedding to PCA coords (same math as a landmark)
+  if (!pcaData || !pcaData.k || !emb) return null;
+  const mean = pcaData.mean, comps = pcaData.components, out = new Array(pcaData.k);
+  for (let k = 0; k < pcaData.k; k++) { let d = 0; const c = comps[k]; for (let i = 0; i < emb.length; i++) d += c[i] * (emb[i] - mean[i]); out[k] = d; }
+  return out;
 }
 
 // Map a coordinate vector to normalized cube coords u_j ∈ [-1,1] within each axis range.
@@ -642,7 +654,7 @@ function drawCube() {
   }
   const k = Math.min(Math.max(1, cubeDim), pcaData.k, CUBE_DIM_MAX);   // shown dims (slider 1..12, clamped to k)
   cubeDimEff = k;
-  if (!R || R.length !== k) { R = buildR(k); posTrail = []; }   // dimension changed -> reset trail
+  if (!R || R.length !== k) { R = buildR(k); posTrail = []; w2Trail = []; }   // dimension changed -> reset trails
   const margin = 22, cx = w / 2, cy = h / 2;
   const ext = Math.max(1, Math.sqrt(k));                 // fixed -> stable size while rotating
   const scale = Math.min((w / 2 - margin) / ext, (h / 2 - margin) / ext) * cubeZoom;
@@ -719,6 +731,36 @@ function drawCube() {
       x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill();
       if (bad) { x.strokeStyle = "rgba(224,101,76,.55)"; x.lineWidth = 1; x.beginPath(); x.arc(p[0], p[1], 7.5, 0, 7); x.stroke(); }
       cubeDots.push({ px: p[0], py: p[1], name: (bad ? "👎 " : "👍 ") + landmarks[i].description, emb: landmarks[i].embedding, kind: "landmark" });
+    }
+  }
+
+  // Non-persistent "feeling" trail: breadcrumbs dropped while wandering (newer = brighter).
+  const _tnow = performance.now();
+  for (let i = 0; i < trailMarks.length; i++) {
+    const f = 1 - (_tnow - trailMarks[i].t) / 20000;   // fade fully out over 20s
+    if (f <= 0) continue;
+    const co = embToCoords(trailMarks[i].embedding); if (!co) continue;
+    const p = P(pcaToU(co));
+    x.fillStyle = `rgba(35,210,154,${(0.85 * f).toFixed(2)})`;
+    x.beginPath(); x.arc(p[0], p[1], 3, 0, 7); x.fill();
+    x.fillStyle = `rgba(201,188,255,${(0.8 * f).toFixed(2)})`;
+    x.font = "10px -apple-system,sans-serif"; x.fillText(trailMarks[i].description, p[0] + 5, p[1] + 3);
+    cubeDots.push({ px: p[0], py: p[1], name: "👍 " + trailMarks[i].description, emb: trailMarks[i].embedding, kind: "trail" });
+  }
+
+  // Wanderer 2 (simulated scout): red dot + red fading tail.
+  if (w2On && w2Vec) {
+    for (let i = 1; i < w2Trail.length; i++) {
+      if (w2Trail[i].length !== pcaData.k || w2Trail[i - 1].length !== pcaData.k) continue;
+      const a = P(pcaToU(w2Trail[i - 1])), b = P(pcaToU(w2Trail[i]));
+      x.strokeStyle = `rgba(224,101,76,${(0.55 * (i / w2Trail.length)).toFixed(3)})`; x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
+    }
+    const wc = embToCoords(w2Vec);
+    if (wc) { const wp = P(pcaToU(wc));
+      x.fillStyle = "#e0654c"; x.strokeStyle = "rgba(224,101,76,.6)"; x.lineWidth = 2;
+      x.beginPath(); x.arc(wp[0], wp[1], 5, 0, 7); x.fill(); x.stroke();
+      x.fillStyle = "rgba(224,101,76,.9)"; x.font = "10px -apple-system,sans-serif"; x.fillText("wanderer 2", wp[0] + 7, wp[1] - 6);
     }
   }
 
@@ -1165,7 +1207,7 @@ sliders.forEach(id => $(id).addEventListener("change", () => {
 
 // ---- Step sequencer: note + drum onsets that natively condition MRT2 (seq -> /stream) ----
 const SEQ_PITCHES = (() => { const scale=[0,2,4,5,7,9,11], out=[]; for(let oct=4;oct<=5;oct++) for(const s of scale) out.push(12*oct+12+s); out.push(84); return out.reverse(); })();  // C4..C6, C-major, highest row first
-let seqSteps=16, seqRate=4, seqNotes=[], seqDrums=[];
+let seqSteps=16, seqRate=4, seqNotes=[], seqDrums=[], heldNotes=new Set();   // heldNotes = MIDI keys down now
 function seqInit(){ seqNotes=Array.from({length:seqSteps},()=>new Set()); seqDrums=Array(seqSteps).fill(0); }
 seqInit();
 function seqMsg(){ return $("seqOn").checked ? { steps:seqSteps, fps:seqRate, notes:seqNotes.map(s=>[...s]), drums:seqDrums.slice() } : null; }
@@ -1189,7 +1231,8 @@ function buildSeqGrid(){
     row.appendChild(lab);
     for(let s=0;s<seqSteps;s++){ const c=document.createElement("span"); c.className="seqcell"; c.dataset.s=s;
       c.style.cssText=seqCell(s,seqNotes[s].has(midi),false);
-      c.addEventListener("click",()=>{ seqNotes[s].has(midi)?seqNotes[s].delete(midi):seqNotes[s].add(midi); c.style.cssText=seqCell(s,seqNotes[s].has(midi),false); pushSeq(); });
+      if (heldNotes.has(midi)) c.style.background = "#ffd24a";   // MIDI key held now -> bright dot
+      c.addEventListener("click",()=>{ seqNotes[s].has(midi)?seqNotes[s].delete(midi):seqNotes[s].add(midi); c.style.cssText=seqCell(s,seqNotes[s].has(midi),false); if(heldNotes.has(midi)) c.style.background="#ffd24a"; pushSeq(); });
       row.appendChild(c); }
     tbl.appendChild(row);
   });
@@ -1210,6 +1253,104 @@ $("seqClear").addEventListener("click",()=>{ seqInit(); buildSeqGrid(); pushSeq(
 $("seqHead").addEventListener("click",()=>{ const b=$("seqBody"), open=b.style.display==="none"; b.style.display=open?"":"none"; $("seqCaret").textContent=open?"▲":"▼"; const gi=$("giPanel"); if(gi) gi.style.display=open?"none":""; if(open) buildSeqGrid(); });
 seqSetBpm(+$("seqBpm").value);
 buildSeqGrid();
+
+// ---- MIDI input (Web MIDI): play a keyboard to step-record into the sequencer ----
+// Each new key/chord fills the next step (chords stack on one step); pitches snap to
+// the grid's scale. Class-compliant controllers (e.g. Arturia MiniLab 3) need no driver.
+// Live play: the keys you HOLD are the active notes — press = note on, release = off.
+// Held notes snap to the grid's scale, light up their row in the sequencer, and are streamed
+// as a 1-step conditioning so the AI plays what you're holding.
+function snapToGrid(m) {
+  let best = SEQ_PITCHES[0], bd = 1e9;
+  for (const p of SEQ_PITCHES) { const d = Math.abs(p - m); if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+function _noteName(m) { const NN = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]; return NN[m % 12] + (Math.floor(m / 12) - 1); }
+function updateHeldHint() {
+  const el = $("seqHint"); if (!el) return;
+  el.textContent = heldNotes.size
+    ? "🎹 holding: " + [...heldNotes].sort((a, b) => a - b).map(_noteName).join(" ")
+    : ($("seqOn") && $("seqOn").checked ? "conditioning ON · the model follows these onsets" : "off · style-only");
+}
+function sendLiveNotes() {
+  if (!(playing && ws && ws.readyState === 1)) return;
+  // held notes -> condition the stream now; none held -> revert to the grid sequence (or free)
+  const seq = heldNotes.size ? { steps: 1, fps: 2, notes: [[...heldNotes]], drums: [] } : seqMsg();   // small chunk -> snappier live response
+  ws.send(JSON.stringify({ type: "seq", seq }));
+}
+function midiNoteOn(m) {
+  heldNotes.add(snapToGrid(m));
+  if ($("seqBody").style.display === "none") $("seqHead").click();   // reveal the grid
+  buildSeqGrid(); updateHeldHint(); sendLiveNotes();                 // light the held cell(s)
+}
+function midiNoteOff(m) { heldNotes.delete(snapToGrid(m)); buildSeqGrid(); updateHeldHint(); sendLiveNotes(); }
+// Faders (CC) -> Style prompt weights. CC73->prompt 1, 75->2, 79->3, 72->4.
+const FADER_CC = { 82: 0, 83: 1, 85: 2, 17: 3 };   // CC -> Style prompt index (weight)
+const CC_SLIDER = { 74: "driftSpeed" };            // CC -> a fixed slider id (74 = travel speed)
+function midiCC(cc, val) {
+  let el = null;
+  if (CC_SLIDER[cc]) el = $(CC_SLIDER[cc]);
+  else if (FADER_CC[cc] !== undefined) el = document.querySelectorAll('#inputs input[data-w]')[FADER_CC[cc]];
+  if (!el) return;
+  const lo = +el.min, hi = +el.max;
+  el.value = lo + (val / 127) * (hi - lo);
+  el.dispatchEvent(new Event("input")); el.dispatchEvent(new Event("change"));   // apply + update readout
+}
+// TEMP: live MIDI monitor (top-right) — shows every CC + its latest value.
+let _ccSeen = {}, _lastMidi = "";
+function renderMidiMon() {
+  const el = $("midiMon"); if (!el) return;
+  const ccs = Object.keys(_ccSeen).map(Number).sort((a, b) => a - b);
+  el.textContent = "MIDI monitor (testing)\nlast: " + (_lastMidi || "—") + "\n\n"
+    + (ccs.length ? ccs.map(c => "CC " + c + " : " + _ccSeen[c]).join("\n") : "(wiggle a knob/fader)");
+}
+let _ch10Down = new Set();   // ch10 pads currently held -> edge-trigger so each press = one pulse
+// Jump the current position to the nearest defined dot (preset/vocab/landmark) on the cube.
+function gotoNearestDot() {
+  if (!pcaData || !pcaData.k || !cubeDots.length) return;
+  let best = null, bd = Infinity;
+  for (const d of cubeDots) {
+    if (!d.emb || d.kind === "current" || d.kind === "trail") continue;
+    const co = embToCoords(d.emb); if (!co) continue;
+    let s = 0; for (let k = 0; k < pcaData.k; k++) { const dd = co[k] - (pcaCoords[k] || 0); s += dd * dd; }
+    if (s < bd) { bd = s; best = d; }
+  }
+  if (best) { log("→ nearest: " + best.name); glideToEmbedding(best.emb); }
+}
+function onMIDI(ev) {
+  const b0 = ev.data[0], b1 = ev.data[1], b2 = ev.data[2], cmd = b0 & 0xf0, ch = (b0 & 0x0f) + 1;
+  _lastMidi = "[" + b0.toString(16) + " " + b1 + " " + b2 + "] ch" + ch
+    + (cmd === 0xB0 ? "  CC" + b1 + "=" + b2
+      : (cmd === 0x90 && b2 > 0) ? "  note " + b1 + " on"
+      : (cmd === 0x80 || cmd === 0x90) ? "  note " + b1 + " off" : "");
+  if (cmd === 0xB0) _ccSeen[b1] = b2;
+  renderMidiMon();
+  const noteOn = cmd === 0x90 && b2 > 0, noteOff = cmd === 0x80 || (cmd === 0x90 && b2 === 0);
+  if (ch === 10) {                                      // ch10 pads -> one pulse per press (edge-triggered)
+    if (noteOn && !_ch10Down.has(b1)) {
+      _ch10Down.add(b1);
+      if (b1 === 40) pauseTravel(); else if (b1 === 41) resumeTravel(); else gotoNearestDot();
+    } else if (noteOff) _ch10Down.delete(b1);
+  }
+  else if (ch === 1) {                                  // grid (notes) -> channel 1 only
+    if (noteOn) midiNoteOn(b1);
+    else if (noteOff) midiNoteOff(b1);
+  }
+  if (cmd === 0xB0) midiCC(b1, b2);                     // faders (any channel)
+}
+async function initMIDI() {
+  if (!navigator.requestMIDIAccess) { return; }
+  try {
+    const access = await navigator.requestMIDIAccess({ sysex: false });
+    const bind = () => {
+      const names = [...access.inputs.values()].map(i => i.name);
+      for (const inp of access.inputs.values()) inp.onmidimessage = onMIDI;
+      if (names.length) log("🎹 MIDI: " + names.join(", ") + " — play keys to fill the sequencer");
+    };
+    bind(); access.onstatechange = bind;
+  } catch (e) { /* permission denied or unsupported */ }
+}
+initMIDI();
 
 // Changing the prompt / audio / seed while playing re-embeds the style live.
 async function restyleLive() {
@@ -1355,7 +1496,7 @@ $("pinDown").addEventListener("click", () => pin("bad"));
 $("describeBox").addEventListener("keydown", e => { if (e.key === "Enter") pin("good"); });
 
 // Smoothly travel from the current embedding to the target over a few seconds.
-let glideId = 0, gliding = false;
+let glideId = 0, gliding = false, travelPaused = false;
 const travelSpeed = () => (+$("driftSpeed").value || 1);   // one slider scales ALL travel (drift + glides)
 const _sleep = ms => new Promise(r => setTimeout(r, ms));
 const _lerp = (a, b, t) => { const o = new Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] + (b[i] - a[i]) * t; return o; };
@@ -1364,6 +1505,7 @@ function applyNavFinal(j) {
   if (playing && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "style", token: j.token }));
 }
 async function glideTo(j) {
+  if (travelPaused) return;
   const target = j.embedding, start = lastVec ? lastVec.slice() : null;
   const myId = ++glideId; gliding = true;   // pauses drift while traveling
   try {
@@ -1382,6 +1524,7 @@ async function glideTo(j) {
 
 // Glide to a raw 768-d embedding (e.g. a cube dot clicked).
 async function glideToEmbedding(target) {
+  if (travelPaused) return;
   const start = lastVec ? lastVec.slice() : null;
   const myId = ++glideId; gliding = true;
   try {
@@ -1396,9 +1539,39 @@ async function glideToEmbedding(target) {
 }
 
 // Navigate by feeling -> Claude picks an action -> glide to the target embedding.
+// Geometric navigation: edge / corner / center / random -> literal cube coordinates (bypasses the LLM).
+function coordsToEmb(coords) {
+  if (!pcaData) return null;
+  const out = pcaData.mean.slice();
+  for (let k = 0; k < pcaData.k; k++) { const c = coords[k] || 0; if (!c) continue; const cp = pcaData.components[k]; for (let i = 0; i < out.length; i++) out[i] += c * cp[i]; }
+  return out;
+}
+function geoNavigate(prompt) {
+  if (!pcaData || !pcaData.k) return null;
+  const p = prompt.toLowerCase(), cubeCtx = /\b(cube|hypercube|space)\b/.test(p);
+  const K = Math.max(1, cubeDimEff || pcaData.k), rng = k => pcaData.ranges[k] || [-1, 1];
+  const vertex = () => { const c = new Array(pcaData.k).fill(0); for (let k = 0; k < K; k++) { const [lo, hi] = rng(k); c[k] = Math.random() < 0.5 ? lo : hi; } return c; };
+  if (/\b(corner|vertex)\b/.test(p)) return vertex();
+  if (/\bedge\b/.test(p)) {                                  // push current position out to the box surface
+    let scale = Infinity, any = false;
+    for (let k = 0; k < K; k++) { const c = pcaCoords[k] || 0; if (Math.abs(c) < 1e-9) continue; const [lo, hi] = rng(k); scale = Math.min(scale, Math.abs((c > 0 ? hi : lo) / c)); any = true; }
+    if (!any || !isFinite(scale)) return vertex();           // at center -> a random corner
+    const c = new Array(pcaData.k).fill(0); for (let k = 0; k < K; k++) c[k] = (pcaCoords[k] || 0) * scale; return c;
+  }
+  if (/\b(cent(er|re)|origin)\b/.test(p) || (/\bmiddle\b/.test(p) && cubeCtx)) return new Array(pcaData.k).fill(0);
+  if (/\b(random|anywhere)\b/.test(p)) { const c = new Array(pcaData.k).fill(0); for (let k = 0; k < K; k++) { const [lo, hi] = rng(k); c[k] = lo + Math.random() * (hi - lo); } return c; }
+  return null;   // not geometric -> let the musical LLM handle it
+}
 async function navigate() {
   const prompt = $("navBox").value.trim();
   if (!prompt) { $("navStatus").textContent = "⚠️ type where you want to go"; return; }
+  const geo = geoNavigate(prompt);                 // edge/corner/center/random -> literal geometry
+  if (geo) {
+    const emb = coordsToEmb(geo);
+    $("navStatus").textContent = "🧭 → cube: " + prompt.toLowerCase();
+    if (emb) glideToEmbedding(emb);
+    return;
+  }
   $("navStatus").textContent = "🧭 thinking…";
   try {
     const r = await fetch("/navigate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
@@ -1411,6 +1584,45 @@ async function navigate() {
 $("navBtn").addEventListener("click", navigate);
 $("navBox").addEventListener("keydown", e => { if (e.key === "Enter") navigate(); });
 
+// ---- "Feeling" trail: sporadically drop a non-persistent 👍 landmark while wandering,
+// named by Claude (a short mood phrase from the nearest vocabulary words at this spot).
+function nearestWords(emb, n) {
+  if (!vocabPoints || !emb) return [];
+  const scored = vocabPoints.map(vp => {
+    let dot = 0, na = 0, nb = 0; const e = vp.embedding;
+    for (let i = 0; i < emb.length; i++) { dot += emb[i] * e[i]; na += emb[i] * emb[i]; nb += e[i] * e[i]; }
+    return { w: vp.word, s: dot / (Math.sqrt(na * nb) || 1) };
+  });
+  scored.sort((a, b) => b.s - a.s);
+  return scored.slice(0, n || 4).map(o => o.w);
+}
+async function feelingFor(emb) {
+  const words = nearestWords(emb, 4);
+  try {
+    const r = await fetch("/feeling", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ words }) });
+    if (r.ok) { const j = await r.json(); if (j.feeling) return j.feeling; }
+  } catch (e) {}
+  return words[0] || "drifting";
+}
+async function dropFeelingMark(emb) {
+  emb = emb || (lastVec ? lastVec.slice() : null);   // default: the music's current spot
+  if (trailBusy || !emb || !pcaData) return;
+  trailBusy = true;
+  try {
+    const desc = await feelingFor(emb);
+    trailMarks.push({ description: desc, embedding: emb, t: performance.now() });
+    if (trailMarks.length > 12) trailMarks.shift();   // safety cap (each also fades out in 20s)
+    drawCube();
+  } catch (e) {} finally { trailBusy = false; }
+}
+// Animate + prune the feeling trail: each mark fades over 20s, then drops off.
+setInterval(() => {
+  if (!trailMarks.length) return;
+  const cutoff = performance.now() - 20000;
+  trailMarks = trailMarks.filter(m => m.t > cutoff);
+  drawCube();
+}, 500);
+
 // Slow autonomous drift: nudge the current embedding with small noise each tick.
 let driftTimer = null, driftVel = null;
 const DRIFT_MS = 450;          // small, frequent steps -> continuous-looking motion
@@ -1418,7 +1630,7 @@ function gaussian() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v)
 // Damped velocity (Ornstein-Uhlenbeck) walk: momentum makes the path meander
 // smoothly instead of jumping in a fresh random direction each tick.
 function driftTick() {
-  if (!lastVec || gliding || (cubeDrag && cubeDrag.mode === "dot")) return;   // don't drift while dragging the dot
+  if (!lastVec || gliding || travelPaused || (cubeDrag && cubeDrag.mode === "dot")) return;   // paused / dragging -> no drift
   const v = lastVec, n = v.length;
   if (!driftVel || driftVel.length !== n) driftVel = new Array(n).fill(0);
   let ss = 0; for (const x of v) ss += x * x;
@@ -1435,10 +1647,53 @@ function driftTick() {
   const scale = norm / (Math.sqrt(s2) || 1);          // keep magnitude steady
   for (let i = 0; i < n; i++) out[i] *= scale;
   applyRawEmbedding(out);
+  if (Math.random() < 0.035) dropFeelingMark();   // sporadically leave a "feeling" breadcrumb (~every 13s)
 }
 $("drift").addEventListener("change", () => {
   if ($("drift").checked) { driftVel = null; driftTick(); driftTimer = setInterval(driftTick, DRIFT_MS); }
   else { clearInterval(driftTimer); driftTimer = null; }
+});
+
+// Freeze/unfreeze ALL position travel (wandering + glides). Driven by ch10 pads.
+function pauseTravel() {
+  travelPaused = true;
+  if (driftTimer) { clearInterval(driftTimer); driftTimer = null; }   // stop wandering
+  glideId++; gliding = false;                                          // cancel any in-flight glide
+  log("⏸ travel paused");
+}
+function resumeTravel() {
+  travelPaused = false;
+  $("drift").checked = true;                               // resume = wander again
+  if (!driftTimer) { driftVel = null; driftTimer = setInterval(driftTick, DRIFT_MS); }
+  driftTick();                                             // move immediately, don't wait a tick
+  log("▶ travel resumed (wandering)");
+}
+
+// Wanderer 2: a simulated scout — wanders the space (red dot + tail) and drops feeling
+// breadcrumbs to follow, but never touches the audio (pure simulation, no /prepare_raw).
+function w2Tick() {
+  if (!pcaData || !w2Vec) return;
+  const v = w2Vec, n = v.length;
+  if (!w2Vel || w2Vel.length !== n) w2Vel = new Array(n).fill(0);
+  let ss = 0; for (const z of v) ss += z * z;
+  const norm = Math.sqrt(ss) || 1, rms = Math.sqrt(ss / n) || 1, speed = travelSpeed();
+  const damp = 0.82, impulse = 0.010 * rms * speed; let s2 = 0;
+  for (let i = 0; i < n; i++) { w2Vel[i] = damp * w2Vel[i] + impulse * gaussian(); v[i] += w2Vel[i]; s2 += v[i] * v[i]; }
+  const scale = norm / (Math.sqrt(s2) || 1); for (let i = 0; i < n; i++) v[i] *= scale;
+  const co = embToCoords(w2Vec); if (co) { w2Trail.push(co); if (w2Trail.length > 80) w2Trail.shift(); }
+  drawCube();
+  if (Math.random() < 0.05) dropFeelingMark(w2Vec.slice());   // scout leaves a breadcrumb (~every 9s)
+}
+$("wander2").addEventListener("change", () => {
+  if ($("wander2").checked) {
+    if (!pcaData) { $("wander2").checked = false; log("⚠️ Wanderer 2 needs the preset space — wait for presets to load."); return; }
+    w2On = true;
+    w2Vec = lastVec ? lastVec.slice() : pcaData.mean.slice();   // fork off from the current spot
+    w2Vel = null; w2Trail = [];
+    w2Timer = setInterval(w2Tick, DRIFT_MS); w2Tick();
+  } else {
+    w2On = false; clearInterval(w2Timer); w2Timer = null; drawCube();
+  }
 });
 
 // Click a pinned place to play its embedding: glide there if streaming, else start from it.

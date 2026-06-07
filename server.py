@@ -872,6 +872,46 @@ async def danmaku(request: Request):
     return {"comments": _danmaku_fallback(style, n), "source": "fallback"}
 
 
+FEELING_SYSTEM = (
+    "You name the FEELING/mood of a moment of music in 2-4 evocative words, lowercase, "
+    "no punctuation — e.g. 'velvet midnight haze', 'restless neon ache', 'warm sunlit drift', "
+    "'glass cathedral hush'. Given the musical elements present, reply with ONLY the phrase."
+)
+_FEELING_POOL = ["velvet midnight haze", "restless neon ache", "warm sunlit drift",
+    "glass cathedral hush", "dusty gold nostalgia", "weightless cobalt calm",
+    "feral electric dusk", "slow amber bloom", "fog over chrome", "tender static glow",
+    "bruised purple swell", "molten lullaby"]
+_FEELING_LENS = ["as a color", "as a time of day", "as a texture", "as a kind of weather",
+    "as a place", "as a half-remembered memory", "as a temperature", "as a body sensation",
+    "as a season", "as a material", "as a creature", "as a light quality"]
+
+
+@app.post("/feeling")
+async def feeling(request: Request):
+    """A short evocative 'feeling' phrase for the current spot (Claude + fallback) —
+    labels the non-persistent trail landmarks dropped while the position wanders."""
+    import random
+    data = await request.json()
+    words = [str(w).strip() for w in (data.get("words") or []) if str(w).strip()][:5]
+    ctx = ", ".join(words) or "ambient electronic"
+    lens = random.choice(_FEELING_LENS)   # vary the prompt -> variety even when the words repeat
+    try:
+        client = get_anthropic()
+        msg = await client.messages.create(
+            model="claude-opus-4-8", max_tokens=32, thinking={"type": "disabled"},
+            system=FEELING_SYSTEM,
+            messages=[{"role": "user", "content":
+                       f"Musical elements: {ctx}. Name the feeling {lens} — 2-4 fresh words; avoid 'pulse' and clichés:"}],
+        )
+        txt = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", None) == "text")
+        txt = txt.strip().splitlines()[0].strip(' ".').lower() if txt.strip() else ""
+        if txt:
+            return {"feeling": txt[:40], "source": "claude"}
+    except Exception:  # noqa: BLE001
+        pass
+    return {"feeling": random.choice(_FEELING_POOL), "source": "fallback"}
+
+
 @app.post("/navigate")
 async def navigate(request: Request):
     """Feeling -> Claude picks an action over the landmark atlas -> target embedding."""
