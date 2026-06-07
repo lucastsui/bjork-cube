@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Björk Cube</title>
+<title>Music Morphing Space</title>
 <style>
   /* ═══ Björk Cube design system — line-art aesthetic ═══ */
   :root {
@@ -768,7 +768,7 @@ function drawCube() {
       if (posTrail[i].length !== k || posTrail[i - 1].length !== k) continue;
       const a = P(pcaToU(posTrail[i - 1])), b = P(pcaToU(posTrail[i]));
       const al = (0.5 * (i / posTrail.length)).toFixed(3);   // older = fainter
-      x.strokeStyle = `rgba(35,192,138,${al})`; x.lineWidth = 1.5;
+      x.strokeStyle = `rgba(224,101,76,${al})`; x.lineWidth = 1.5;
       x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
     }
   }
@@ -832,23 +832,23 @@ function drawCube() {
     for (let i = 1; i < w2Trail.length; i++) {
       if (w2Trail[i].length !== pcaData.k || w2Trail[i - 1].length !== pcaData.k) continue;
       const a = P(pcaToU(w2Trail[i - 1])), b = P(pcaToU(w2Trail[i]));
-      x.strokeStyle = `rgba(224,101,76,${(0.55 * (i / w2Trail.length)).toFixed(3)})`; x.lineWidth = 1.5;
+      x.strokeStyle = `rgba(35,192,138,${(0.55 * (i / w2Trail.length)).toFixed(3)})`; x.lineWidth = 1.5;
       x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
     }
     const wc = embToCoords(w2Vec);
     if (wc) { const wp = P(pcaToU(wc));
-      x.fillStyle = "#e0654c"; x.strokeStyle = "rgba(224,101,76,.6)"; x.lineWidth = 2;
+      x.fillStyle = "#fff"; x.strokeStyle = "#23c08a"; x.lineWidth = 2;
       x.beginPath(); x.arc(wp[0], wp[1], 6, 0, 7); x.fill(); x.stroke();
-      x.fillStyle = "rgba(224,101,76,.9)"; x.font = "bold 16px -apple-system,sans-serif"; x.fillText("wanderer 2", wp[0] + 7, wp[1] - 6);
+      x.fillStyle = "rgba(231,233,238,.95)"; x.font = "bold 16px -apple-system,sans-serif"; x.fillText("wanderer 2", wp[0] + 7, wp[1] - 6);
       cubeDots.push({ px: wp[0], py: wp[1], name: "wanderer 2", emb: w2Vec.slice(), kind: "wander2" });   // click to travel to the scout
     }
   }
 
   // Current position (draggable bright dot).
   const pc = P(pcaToU(pcaCoords));
-  x.fillStyle = "#fff"; x.strokeStyle = "#23c08a"; x.lineWidth = 2;
+  x.fillStyle = "#e0654c"; x.strokeStyle = "rgba(224,101,76,.6)"; x.lineWidth = 2;
   x.beginPath(); x.arc(pc[0], pc[1], 7.5, 0, 7); x.fill(); x.stroke();
-  x.fillStyle = "rgba(231,233,238,.95)"; x.font = "bold 16px -apple-system,sans-serif"; x.fillText("HACKATHON", pc[0] + 10, pc[1] + 20);
+  x.fillStyle = "rgba(224,101,76,.9)"; x.font = "bold 16px -apple-system,sans-serif"; x.fillText("HACKATHON", pc[0] + 10, pc[1] + 20);
   cubeDots.push({ px: pc[0], py: pc[1], name: "Hackspace Hackathon 2026", emb: null, kind: "current" });
 
 
