@@ -31,6 +31,8 @@
   ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.18); border-radius:8px; border:2px solid transparent; background-clip:padding-box; }
   ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.30); }
   ::-webkit-scrollbar-corner { background:transparent; }
+  /* visually-hidden text that screen readers still read */
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
   body { margin:0; font:15px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
   header { padding:22px 28px; border-bottom:1px solid var(--line); }
   header h1 { margin:0; font-size:20px; font-weight:300; }
@@ -437,7 +439,7 @@ function createRow(inp) {
   const wWrap = document.createElement("div"); wWrap.className = "wwrap";
   const wlab = document.createElement("span"); wlab.textContent = "w";
   const wr = document.createElement("input");
-  wr.type = "range"; wr.min = "0"; wr.max = "2"; wr.step = "0.05"; wr.value = inp.weight; wr.dataset.w = "1";   // tagged so MIDI faders can drive prompt weights
+  wr.type = "range"; wr.min = "0"; wr.max = "1"; wr.step = "0.05"; wr.value = inp.weight; wr.dataset.w = "1";   // tagged so MIDI faders can drive prompt weights
   const wv = document.createElement("span"); wv.className = "wv"; wv.textContent = (+inp.weight).toFixed(2);
   wr.addEventListener("input", () => { inp.weight = +wr.value; wv.textContent = (+wr.value).toFixed(2); onStyleChange(); });
   wWrap.append(wlab, wr, wv);
@@ -1662,7 +1664,7 @@ async function pin(polarity) {
     const r = await fetch("/landmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: desc, embedding: lastVec, polarity }) });
     const j = await r.json();
     if (!r.ok) { $("navStatus").textContent = "⚠️ " + (j.error || r.status); return; }
-    $("navStatus").textContent = (polarity === "bad" ? "👎 avoiding: " : "👍 pinned: ") + desc;
+    $("navStatus").textContent = (polarity === "bad" ? "avoiding: " : "pinned: ") + desc;
     $("describeBox").value = "";
     loadLandmarks();
   } catch (e) { $("navStatus").textContent = "⚠️ " + e; }
@@ -1852,11 +1854,15 @@ $("drift").addEventListener("change", () => {
 
 // Freeze/unfreeze ALL position travel (wandering + glides). Driven by ch10 pads.
 function pauseTravel() {
-  travelPaused = true;
-  if (driftTimer) { clearInterval(driftTimer); driftTimer = null; }   // stop wandering
-  stopDir();                                                          // stop directional travel
+  // note 40: cancel the CURRENT directed travel (a glide, or directional travel) ONCE, then keep
+  // wandering. Does NOT latch — a later go-to-nearest/furthest/random still works, and wandering
+  // continues after the stop.
   glideId++; gliding = false;                                          // cancel any in-flight glide
-  log("⏸ travel paused");
+  stopDir();                                                          // stop directional travel
+  const dc = $("drift"); if (dc) dc.checked = true;                    // wandering continues after the stop
+  if (!driftTimer) { driftVel = null; driftTimer = setInterval(driftTick, DRIFT_MS); }
+  driftTick();
+  log("⏸ stopped");
 }
 function resumeTravel() {
   travelPaused = false;
@@ -1942,9 +1948,10 @@ async function loadLandmarks() {
       const bad = lm.polarity === "bad";
       const chip = document.createElement("span"); chip.className = "chip" + (bad ? " bad" : "");
       chip.style.cursor = "pointer"; chip.title = bad ? "avoid place — click to audition" : "click to play this place";
-      chip.textContent = (bad ? "👎 " : "") + lm.description + " ";
+      // emoji is visible-only (aria-hidden); screen readers get the plain word instead
+      chip.innerHTML = (bad ? '<span aria-hidden="true">👎 </span><span class="sr-only">avoid place: </span>' : '') + esc(lm.description) + " ";
       chip.addEventListener("click", () => gotoLandmark(lm.id, lm.description));
-      const x = document.createElement("button"); x.className = "mini"; x.textContent = "×";
+      const x = document.createElement("button"); x.className = "mini"; x.textContent = "×"; x.title = "remove place";
       x.style.cssText = "width:18px;height:18px;padding:0;font-size:12px;margin-left:4px;display:inline-flex;align-items:center;justify-content:center;";
       x.addEventListener("click", async (e) => { e.stopPropagation(); await fetch("/landmark/" + lm.id, { method: "DELETE" }); loadLandmarks(); });
       chip.appendChild(x); el.appendChild(chip);
@@ -1990,6 +1997,24 @@ function updateNowWords() {
 }
 updateNowWords();
 setInterval(updateNowWords, 1500);
+
+// Accessible names for every control: sliders <- their visible label; text inputs <- placeholder;
+// titled buttons/selects <- their title. Idempotent; re-runs to catch dynamically-rendered
+// controls (PCA sliders, prompt rows, preset deletes).
+function applyA11yLabels() {
+  document.querySelectorAll('.slider').forEach(s => {
+    const lab = s.querySelector('.lab'), inp = s.querySelector('input, select');
+    if (lab && inp && !inp.getAttribute('aria-label')) inp.setAttribute('aria-label', lab.textContent.trim());
+  });
+  document.querySelectorAll('input[type=text], textarea').forEach(i => {
+    if (!i.getAttribute('aria-label') && !i.closest('label') && i.placeholder) i.setAttribute('aria-label', i.placeholder);
+  });
+  document.querySelectorAll('button[title], select[title]').forEach(b => {
+    if (!b.getAttribute('aria-label') && b.title) b.setAttribute('aria-label', b.title);
+  });
+}
+applyA11yLabels();
+setInterval(applyA11yLabels, 2500);
 
 // Turn ON slow drift + Wanderer 2 by default, once the cube's PCA map is ready.
 (function startDefaults(n){
