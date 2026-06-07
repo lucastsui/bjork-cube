@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="robots" content="noindex">
+<title>Björk Cube — audience</title>
+<style>
+  /* ── Björk Cube · audience — self-contained mobile theme ── */
+  :root{
+    --bg:#0f1115;          /* ink-800  */
+    --panel:#181b22;       /* ink-700  */
+    --field:#0d0f14;       /* ink-850  */
+    --line:#262b35;        /* ink-600  */
+    --text:#e7e9ee;        /* paper    */
+    --muted:#8b93a4;       /* slate-400 */
+    --faint:#5b6470;       /* stroke-dim */
+    --accent:#23c08a;      /* mint-500 — brand/live */
+    --accent-bright:#3ad29a;
+    --accent-dim:rgba(35,192,138,.12);
+    --coral:#e0654c;       /* coral-500 — warnings */
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0;
+    min-height:100dvh;
+    background:
+      radial-gradient(130% 90% at 50% -10%, rgba(35,192,138,.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font:16px/1.55 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .wrap{
+    max-width:520px;
+    margin:0 auto;
+    padding:max(26px,env(safe-area-inset-top))
+            max(18px,env(safe-area-inset-right))
+            calc(48px + env(safe-area-inset-bottom))
+            max(18px,env(safe-area-inset-left));
+  }
+  header{ margin-bottom:6px; }
+  .brand{
+    margin:0 0 5px; font-size:11px; font-weight:500;
+    text-transform:uppercase; letter-spacing:.2em; color:var(--muted);
+  }
+  h1{ margin:0; font-size:23px; font-weight:300; letter-spacing:.01em; }
+
+  /* ── live / closed banner ── */
+  .banner{
+    margin:18px 0 22px; padding:12px 15px; border-radius:12px;
+    font-size:14px; border:1px solid var(--line);
+    display:flex; align-items:center; gap:10px;
+    transition:color .2s, border-color .2s, background .2s;
+  }
+  .banner.live{ color:var(--accent); border-color:rgba(35,192,138,.42); background:var(--accent-dim); }
+  .banner.closed{ color:var(--muted); }
+  .dot{
+    width:9px; height:9px; border-radius:50%; flex:none;
+    background:var(--accent);
+    box-shadow:0 0 0 0 rgba(35,192,138,.5);
+    animation:pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%  { box-shadow:0 0 0 0 rgba(35,192,138,.45); }
+    70% { box-shadow:0 0 0 9px rgba(35,192,138,0); }
+    100%{ box-shadow:0 0 0 0 rgba(35,192,138,0); }
+  }
+
+  /* ── question cards ── */
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:18px 18px 18px; margin-bottom:16px;
+    transition:opacity .2s, border-color .2s;
+  }
+  .card h2{ margin:0 0 13px; font-size:17px; font-weight:500; line-height:1.3; }
+
+  .field{
+    width:100%; display:block;
+    background:var(--field); color:var(--text);
+    border:1px solid var(--line); border-radius:12px;
+    padding:14px; font:inherit;
+    font-size:16px;            /* >=16px so iOS Safari never zoom-snaps on focus */
+    line-height:1.5;
+    transition:border-color .15s;
+  }
+  textarea.field{ resize:none; min-height:84px; }
+  .field:focus{ outline:none; border-color:var(--accent); }
+  .field::placeholder{ color:var(--faint); }
+  .field:disabled{ opacity:.5; cursor:not-allowed; }
+
+  .cardfoot{ display:flex; align-items:center; gap:10px; margin-top:13px; }
+  .count{ font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; flex:none; }
+  .spacer{ flex:1; min-width:8px; }
+  .sendmsg{ font-size:13px; opacity:0; transition:opacity .15s; white-space:nowrap; }
+  .sendmsg.show{ opacity:1; }
+  .sendmsg.ok{ color:var(--accent); }
+  .sendmsg.warn{ color:var(--coral); }
+
+  .send{
+    -webkit-appearance:none; appearance:none;
+    border:1px solid var(--accent); border-radius:12px;
+    background:var(--accent-dim); color:var(--accent-bright);
+    font:inherit; font-size:16px; font-weight:600;   /* big tap target */
+    padding:13px 22px; min-width:104px; flex:none;
+    cursor:pointer; touch-action:manipulation;
+    transition:background .15s, transform .08s, opacity .2s, border-color .2s, color .2s;
+  }
+  .send:hover{ background:rgba(35,192,138,.2); }
+  .send:active{ transform:scale(.97); }
+  .send:disabled{
+    opacity:.45; cursor:not-allowed;
+    border-color:var(--line); color:var(--muted); background:transparent;
+  }
+
+  body.closed .card{ opacity:.72; }
+
+  footer{
+    margin-top:26px; text-align:center; line-height:1.6;
+    font-size:12px; color:var(--faint);
+  }
+</style>
+</head>
+<body class="closed">
+  <div class="wrap">
+    <header>
+      <p class="brand">Björk Cube</p>
+      <h1>Chart the Hyper Space!</h1>
+    </header>
+
+    <div class="banner closed" id="banner" role="status" aria-live="polite">
+      the demo channel is closed right now
+    </div>
+
+    <!-- Q1 — FEELING -> /audience/feel (breadcrumb on the cube) -->
+    <section class="card" id="cardFeel">
+      <h2>The music NOW feels…</h2>
+      <input class="field" id="feelInput" type="text" maxlength="40"
+             placeholder="a feeling, in a word or two…"
+             autocomplete="off" autocapitalize="none" autocorrect="off"
+             spellcheck="false" enterkeyhint="send" inputmode="text" disabled>
+      <div class="cardfoot">
+        <span class="count" id="feelCount">0/40</span>
+        <span class="spacer"></span>
+        <span class="sendmsg" id="feelMsg" aria-live="polite"></span>
+        <button class="send" id="feelSend" type="button" disabled>Send</button>
+      </div>
+    </section>
+
+    <!-- Q2 — COMMENT -> /audience/say (danmaku bullet on the big screen) -->
+    <section class="card" id="cardSay">
+      <h2>Steer the course!</h2>
+      <textarea class="field" id="sayInput" maxlength="80" rows="2"
+                placeholder="e.g. lighter, blast the bass, get crazy…"
+                autocomplete="off" spellcheck="false" disabled></textarea>
+      <div class="cardfoot">
+        <span class="count" id="sayCount">0/80</span>
+        <span class="spacer"></span>
+        <span class="sendmsg" id="sayMsg" aria-live="polite"></span>
+        <button class="send" id="saySend" type="button" disabled>Send</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+  (function(){
+    "use strict";
+    var $ = function(id){ return document.getElementById(id); };
+
+    var channelOpen = null;            // null = unknown until first status poll
+    var banner = $("banner");
+
+    // Each card: its OWN field + OWN Send button, posted INDIVIDUALLY.
+    var feel = { input:$("feelInput"), send:$("feelSend"), msg:$("feelMsg"),
+                 count:$("feelCount"), path:"/audience/feel", max:40, t:0 };
+    var say  = { input:$("sayInput"),  send:$("saySend"),  msg:$("sayMsg"),
+                 count:$("sayCount"),  path:"/audience/say",  max:80, t:0 };
+    var cards = [feel, say];
+
+    // ── live character counters ──
+    cards.forEach(function(c){
+      c.updateCount = function(){ c.count.textContent = c.input.value.length + "/" + c.max; };
+      c.input.addEventListener("input", c.updateCount);
+      c.updateCount();
+    });
+
+    // ── reflect channel open/closed state in the UI ──
+    function setOpen(open){
+      if(open === channelOpen) return;       // avoid restarting the dot pulse on every poll
+      channelOpen = open;
+      document.body.classList.toggle("closed", !open);
+      cards.forEach(function(c){
+        c.input.disabled = !open;
+        c.send.disabled  = !open;
+      });
+      if(open){
+        banner.className = "banner live";
+        banner.innerHTML = '<span class="dot"></span><span>live — share your vibe</span>';
+      } else {
+        banner.className = "banner closed";
+        banner.textContent = "the demo channel is closed right now";
+      }
+    }
+
+    // ── transient feedback under each card ──
+    function flash(c, text, kind){
+      c.msg.textContent = text;
+      c.msg.className = "sendmsg show " + (kind || "");
+      clearTimeout(c.t);
+      c.t = setTimeout(function(){ c.msg.className = "sendmsg"; }, 2300);
+    }
+
+    // ── poll GET /audience/status every ~4s ──
+    function poll(){
+      fetch("/audience/status", { cache:"no-store" })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if(j) setOpen(!!j.open); })
+        .catch(function(){ /* keep last known state; phones come and go */ });
+    }
+
+    // ── POST one card's text ──
+    function send(c){
+      if(!channelOpen){ flash(c, "channel closed", "warn"); return; }
+      var text = c.input.value.trim();
+      if(!text){ flash(c, "type something first", "warn"); return; }
+      c.send.disabled = true;
+      fetch(c.path, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ text: text })
+      }).then(function(r){
+        if(r.status === 200){
+          c.input.value = "";
+          c.updateCount();
+          flash(c, "sent ✓", "ok");
+        } else if(r.status === 429){
+          flash(c, "slow down a moment", "warn");
+        } else if(r.status === 403){
+          flash(c, "channel closed", "warn");
+          setOpen(false);
+        } else if(r.status === 400){
+          flash(c, "type something first", "warn");
+        } else {
+          flash(c, "hmm, try again", "warn");
+        }
+      }).catch(function(){
+        flash(c, "network error", "warn");
+      }).then(function(){
+        c.send.disabled = !channelOpen;   // re-enable only if still open
+      });
+    }
+
+    cards.forEach(function(c){
+      c.send.addEventListener("click", function(){ send(c); });
+    });
+    // Enter sends the single-line feeling (textarea keeps newline behaviour)
+    feel.input.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){ e.preventDefault(); send(feel); }
+    });
+
+    // ── boot ──
+    setOpen(false);
+    poll();
+    setInterval(poll, 4000);
+    document.addEventListener("visibilitychange", function(){
+      if(!document.hidden) poll();
+    });
+  })();
+  </script>
+</body>
+</html>

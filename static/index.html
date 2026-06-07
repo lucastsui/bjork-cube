@@ -54,14 +54,15 @@
   .slider .lab { width:130px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:var(--track); }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
   .inrow { margin-bottom:12px; }
-  .inrow-top { display:flex; align-items:center; gap:8px; }
+  .inrow-top { display:flex; align-items:stretch; gap:8px; }
   .inrow-bot { display:flex; align-items:center; gap:8px; margin-top:6px; }
   .inrow-bot .wwrap { width:auto; flex:1; }
-  .inrow select.tsel { background:var(--ink-850); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:9px 6px; font:inherit; }
+  .inrow .tsel { display:flex; align-items:center; justify-content:space-between; gap:10px; box-sizing:border-box; width:104px; background:var(--ink-850); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:9px 12px; font:inherit; cursor:pointer; white-space:nowrap; }
+  .inrow .tsel:hover { border-color:var(--accent2); }
   .inmid { flex:1; min-width:0; }
-  .inmid input { width:100%; }
+  .inmid input { width:100%; display:block; }   /* block -> no inline-block baseline gap (matches dropzone height) */
   .inmid.dropping { outline:2px dashed var(--accent2); outline-offset:2px; border-radius:8px; }
-  .dropzone { display:block; border:1px dashed var(--line); border-radius:8px; padding:9px 12px; color:var(--muted); font-size:12px; cursor:pointer; text-align:center; transition:border-color .15s,color .15s; }
+  .dropzone { display:block; border:1px dashed var(--line); border-radius:9px; padding:10px 12px; color:var(--muted); font:inherit; cursor:pointer; text-align:center; transition:border-color .15s,color .15s; }
   .dropzone:hover { border-color:var(--accent2); color:var(--text); }
   .wwrap { display:flex; align-items:center; gap:6px; width:185px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:var(--track); }
   .wwrap input[type=range] { flex:1; }
@@ -83,11 +84,20 @@
   .hide { display:none; }
   .toprow { display:flex; gap:18px; align-items:stretch; flex-wrap:wrap; }
   .topleft { flex:1; min-width:300px; }
-  .bubbles { min-width:260px; height:200px; position:relative; overflow:hidden; border:1px solid var(--line); border-radius:10px; background:var(--ink-900); margin-bottom:18px; }
-  .bubble { position:absolute; left:0; top:0; white-space:nowrap; padding:5px 11px; border-radius:14px; font-size:12px; cursor:grab; user-select:none; border:1px solid; will-change:transform; touch-action:none; }
-  .bubble.inst { color:var(--violet-300); border-color:rgba(124,92,255,.55); background:rgba(124,92,255,.10); }
-  .bubble.genre { color:var(--mint-300); border-color:rgba(35,192,138,.55); background:rgba(35,192,138,.10); }
-  .bubble.ghost { position:fixed; transform:translate(-50%,-50%); z-index:1000; opacity:.95; cursor:grabbing; box-shadow:0 4px 18px rgba(0,0,0,.5); }
+  /* Ingredients: a calm, browsable tag field (line-art aesthetic) */
+  .ifilter { width:100%; margin-bottom:10px; }
+  #ingList { max-height:210px; overflow:auto; margin-bottom:4px; }
+  .igrp { font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:var(--track); color:var(--slate-500); margin:0 0 8px; }
+  .igrp.g2 { margin-top:14px; }
+  .icloud { display:flex; flex-wrap:wrap; gap:6px; }
+  .ing { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--line); border-radius:999px; background:var(--ink-850); color:var(--slate-400); font-size:12px; cursor:grab; user-select:none; touch-action:none; transition:border-color .12s,color .12s; }
+  .ing:hover { border-color:var(--accent2); color:var(--text); }
+  .ing::before { content:""; width:5px; height:5px; border-radius:50%; flex:none; }
+  .ing.inst::before { background:var(--violet-500); }
+  .ing.genre::before { background:var(--mint-500); }
+  .ing.hidden { display:none; }
+  /* drag ghost (shared with the chip drag) */
+  .bubble.ghost { position:fixed; left:0; top:0; white-space:nowrap; padding:5px 11px; border-radius:999px; font-size:12px; border:1px solid var(--accent2); background:var(--ink-700); color:var(--text); transform:translate(-50%,-50%); z-index:1000; opacity:.95; cursor:grabbing; box-shadow:0 4px 18px rgba(0,0,0,.5); }
   .inrow.drop { outline:2px dashed var(--accent2); outline-offset:2px; border-radius:8px; }
   .inrow.dropno { outline:2px dashed var(--coral-500); outline-offset:2px; border-radius:8px; }
   #stylePanel.dropnew { outline:2px dashed var(--accent2); outline-offset:3px; }
@@ -108,11 +118,20 @@
   .chip.bad:hover { border-color:var(--coral-500); }
   .mini { padding:7px 14px; border:1px solid var(--stroke-dim); border-radius:8px; background:var(--ink-850); color:var(--muted); cursor:pointer; font:inherit; font-size:13px; transition:border-color .15s,color .15s; }
   .mini:hover { color:var(--text); border-color:var(--accent2); }
+  .btnrow .mini { padding:7px 10px; white-space:nowrap; }
   /* checkboxes -> sliding toggle switches */
   input[type="checkbox"] { -webkit-appearance:none; appearance:none; flex:none; position:relative; width:34px; height:19px; margin:0; border-radius:999px; background:rgba(255,255,255,.16); cursor:pointer; vertical-align:middle; transition:background .15s; }
   input[type="checkbox"]::after { content:""; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background:#e7e9ee; transition:transform .15s; }
   input[type="checkbox"]:checked { background:var(--accent2,#23c08a); }
   input[type="checkbox"]:checked::after { transform:translateX(15px); background:#fff; }
+  /* breadcrumb map: AI + audience feelings pinned to embedding coordinates */
+  #bcList { max-height:230px; overflow:auto; font-family:ui-monospace,Menlo,monospace; font-size:11px; line-height:1.7; white-space:pre-wrap; word-break:break-word; color:var(--muted); }
+  .bcrow { padding:6px 8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:var(--ink-850); }
+  .bctag { display:inline-block; font-size:9px; text-transform:uppercase; letter-spacing:.08em; padding:1px 6px; border-radius:999px; margin-right:6px; vertical-align:middle; }
+  .bctag.crowd { color:#0b0d12; background:var(--mint-500); }
+  .bctag.ai { color:var(--mint-300); border:1px solid var(--mint-500); }
+  .bcdesc { font-size:12px; color:var(--text); }
+  .bccoord { margin-top:3px; font-family:ui-monospace,Menlo,monospace; font-size:10px; color:var(--muted); word-break:break-all; }
   .seq { transition:opacity .15s; }
   .roll, .drum { display:grid; gap:2px; }
   .cell { height:13px; background:var(--ink-850); border-radius:2px; cursor:pointer; }
@@ -154,16 +173,28 @@
   .ov-bc { bottom:14px; left:50%; transform:translateX(-50%); width:auto; max-width:min(640px,62vw); max-height:calc(50vh - 22px); }
   .ov-left { top:56px; left:0; bottom:0; width:340px; max-height:calc(100vh - 56px); border-radius:0; border-top:0; border-left:0; }
   .ov-right { top:56px; right:0; bottom:0; width:340px; max-height:calc(100vh - 56px); display:flex; flex-direction:column; overflow:hidden; border-radius:0; border-top:0; border-right:0; }
-  #groovePanel { flex:0 0 50%; display:flex; flex-direction:column; min-height:0; }   /* Groove map = top half of the card */
-  #grooveHead { margin-bottom:10px; flex:none; }
-  #grooveHead .mini { margin-left:auto; }
-  #grooveFrame { width:100%; flex:1 1 auto; min-height:0; border:0; border-radius:8px; background:var(--ink-900); display:block; }
-  .ov-lower { flex:1 1 50%; overflow:auto; min-height:0; }   /* Sampling + PCA share the scrollable bottom half */
-  #groovePanel.expanded { position:fixed; left:40px; right:40px; top:64px; bottom:40px; width:auto; max-width:none; max-height:none; flex:none; transform:none; }
-  #groovePanel.expanded #grooveFrame { flex:1 1 auto; }
+  #groovePanel { display:flex; flex-direction:column; min-height:0; overflow:hidden; }   /* Groove map: collapsible section in the scroll area, below Audience */
+  #groovePanel.gcol #grooveWrap { display:none; }            /* collapsed -> just the header */
+  #grooveHead { margin-bottom:10px; flex:none; justify-content:flex-start; }
+  #grooveHead .caret { color:var(--muted); font-size:12px; margin-left:auto; }
+  #grooveHead .mini { margin-left:8px; }
+  #grooveWrap { height:300px; position:relative; overflow:hidden; border-radius:8px; background:var(--ink-900); }
+  /* the groove app is designed for ~680px; render the iframe at that width and scale the whole thing to fit the card (JS sets exact height + scale) */
+  #grooveFrame { position:absolute; top:0; left:0; width:680px; height:1200px; transform-origin:top left; transform:scale(0.45); border:0; background:var(--ink-900); display:block; }
+  .ov-lower { flex:1 1 auto; overflow:auto; min-height:0; }   /* scrollable: Audience QR + Groove + Sampling + PCA */
+  #groovePanel.expanded { position:fixed; left:40px; right:40px; top:64px; bottom:40px; width:auto; max-width:none; max-height:none; z-index:40; background:rgba(24,27,34,.98); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  #groovePanel.expanded #grooveWrap { height:auto; flex:1 1 auto; }
   /* Groove Cube opens as a full-screen iframe overlay — isolated, can't touch the style cube or stream. */
   /* Inline Groove instrument (native, bottom-center) */
-  #giPanel { width:min(620px,58vw); }
+  /* Step sequencer + Groove instrument share one bottom dock (segmented toggle) */
+  #giPanel, #seqPanel { left:354px; transform:none; bottom:62px; width:auto; max-width:min(680px,calc(100vw - 368px)); display:none; }
+  #giPanel .ovhead, #seqPanel .ovhead { display:none; }
+  #dock { left:354px; transform:none; bottom:14px; max-width:min(680px,calc(100vw - 368px)); padding:6px; }
+  .seg { display:flex; }
+  .segbtn { flex:1; padding:8px 12px; background:var(--ink-850); border:1px solid var(--line); color:var(--muted); cursor:pointer; font:inherit; font-size:13px; transition:color .15s,border-color .15s; }
+  .segbtn:first-child { border-radius:8px 0 0 8px; }
+  .segbtn:last-child { border-radius:0 8px 8px 0; border-left:0; }
+  .segbtn.active { color:var(--text); border-color:var(--accent2); }
   #giPad { width:170px; height:148px; background:var(--ink-900); border:1px solid var(--line); border-radius:8px; cursor:crosshair; flex:none; display:block; }
   #giStrip { flex:1; min-width:0; height:148px; display:block; }
   /* Danmaku (bullet-screen) — Gen-Z comments flowing right→left across the top */
@@ -171,6 +202,8 @@
   @keyframes dmflow { to { transform: translateX(var(--dmdx, -110vw)); } }
   .dm-item { position:absolute; white-space:nowrap; font-size:15px; font-weight:500; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.6); will-change:transform; pointer-events:auto; cursor:pointer; }
   .dm-item:hover { animation-play-state:paused; text-decoration:underline; color:var(--violet-300,#c9bcff); }
+  .dm-item.aud{ color:var(--accent2); }
+  .dm-item.aud::before{ content:"\25CF "; }
   .dm-tog { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; white-space:nowrap; cursor:pointer; user-select:none; text-shadow:0 1px 2px rgba(0,0,0,.8); }
   #dmCtl { position:fixed; top:62px; left:354px; z-index:20; display:flex; align-items:center; }
 </style>
@@ -195,14 +228,22 @@
 <canvas id="pcaCube"></canvas>
 <div id="danmaku"></div>
 <div id="dmCtl">
-  <label class="dm-tog" title="live Gen-Z suggestions for where to take the music"><input type="checkbox" id="dmToggle"> comments</label>
+  <label class="dm-tog" title="live Gen-Z suggestions for where to take the music"><input type="checkbox" id="dmToggle"> danmaku</label>
 </div>
 
 
 <!-- Inline Groove instrument: morph grooves over a fixed beat, native (no tab switch). -->
+<!-- Bottom dock: one segmented bar toggles the Step sequencer / Groove instrument -->
+<div class="ov ov-bc" id="dock">
+  <div class="seg">
+    <button class="segbtn" id="dockSeq">Step sequencer</button>
+    <button class="segbtn" id="dockGi">Groove instrument</button>
+  </div>
+</div>
+
 <div class="ov ov-bc" id="giPanel">
   <div class="ovhead" id="giHead"><h2 style="margin:0">Groove instrument</h2><span class="caret" id="giCaret">▼</span></div>
-  <div id="giBody" style="display:none">
+  <div id="giBody">
     <div class="row" style="gap:10px; margin:10px 0 8px; flex-wrap:wrap">
       <button id="giPlay" class="mini">▶ play loop</button>
       <button id="giStop" class="mini" disabled>■ stop</button>
@@ -224,9 +265,9 @@
 </div>
 
 <!-- Step sequencer: note + drum onsets that natively condition MRT2 generation (seq -> /stream). -->
-<div class="ov ov-bc" id="seqPanel" style="bottom:66px; max-width:min(700px,68vw)">
+<div class="ov ov-bc" id="seqPanel">
   <div class="ovhead" id="seqHead"><h2 style="margin:0">Step sequencer</h2><span class="caret" id="seqCaret">▼</span></div>
-  <div id="seqBody" style="display:none">
+  <div id="seqBody">
     <div class="row" style="gap:12px; margin:0 0 8px; flex-wrap:wrap; align-items:center">
       <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="seqOn"> condition the music</label>
       <label style="display:flex;align-items:center;gap:6px">steps
@@ -252,15 +293,16 @@
   <div id="stylePanel">
     <h2>Style — mix prompts &amp; audio</h2>
     <div id="inputs"></div>
-    <div style="margin-top:4px; display:flex; gap:8px; flex-wrap:wrap;">
-      <button id="addInput" class="mini">+ add input</button>
-      <button id="savePreset" class="mini">★ save preset</button>
+    <div class="btnrow" style="margin-top:4px; display:flex; gap:6px; flex-wrap:nowrap; align-items:center;">
+      <button id="addInput" class="mini" title="add input">+</button>
+      <button id="savePreset" class="mini" title="save preset"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
       <button id="luckyBtn" class="mini">I'm feeling lucky</button>
     </div>
   </div>
   <div class="sec2">
     <h2>Ingredients</h2>
-    <div id="bubbles" class="bubbles" title="Drag a word onto the Style section: onto a prompt to add it there, onto empty space to make a new prompt."></div>
+    <input type="text" id="ingFilter" class="ifilter" placeholder="filter ingredients…">
+    <div id="ingList" title="drag a word onto a prompt (or empty space for a new one), or click to add"></div>
   </div>
   <div class="sec2">
     <h2>Presets</h2>
@@ -269,8 +311,8 @@
   </div>
   <div class="sec2">
     <h2>Wander &amp; navigate</h2>
-    <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="drift"> slow drift (wander on its own)</label>
-    <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="wander2"> Wanderer 2</label>
+    <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="drift" checked> slow drift (wander on its own)</label>
+    <label class="row" style="gap:8px; margin-bottom:8px"><input type="checkbox" id="wander2" checked> Wanderer 2</label>
     <div class="slider" style="margin-bottom:8px"><span class="lab">travel speed</span><input type="range" id="driftSpeed" min="0.2" max="3" step="0.1" value="1"><span class="val" id="driftSpeed_v"></span></div>
     <div class="row" style="gap:8px; margin-bottom:8px">
       <input type="text" id="describeBox" placeholder="describe this place… e.g. corporate music but with bass">
@@ -284,16 +326,34 @@
     <div class="hint" id="navStatus"></div>
     <div id="landmarkList" class="chips"></div>
   </div>
+  <div class="sec2">
+    <h2>Audience</h2>
+    <label class="row" style="gap:8px"><input type="checkbox" id="audOpen"> open audience channel</label>
+    <div class="hint" id="audState">channel closed</div>
+  </div>
+  <div class="sec2">
+    <h2>Breadcrumb map · words ↔ vectors</h2>
+    <div class="hint" style="margin:0 0 8px">Social interpretations of the style space, accumulating — each phrase pinned to a raw 768-d embedding vector (first 5 values shown).</div>
+    <div id="bcList"></div>
+  </div>
 </div>
 
 <!-- BOTTOM-RIGHT: Sampling + PCA sliders -->
 <!-- RIGHT: Groove map (top) + Sampling & guidance + PCA explorer (one card) -->
 <div class="ov ov-right">
-  <div id="groovePanel">
-    <div class="ovhead" id="grooveHead"><h2 style="margin:0">Groove map</h2><button id="grooveExpand" class="mini" title="expand">⤢</button></div>
-    <iframe id="grooveFrame" src="/groove" title="Morphing Groove Map"></iframe>
+  <div id="charter" style="flex:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line)">
+    <div style="font-size:72px; font-weight:700; color:var(--text); margin-bottom:10px; line-height:1.04">Music Map</div>
+    <div class="hint" style="margin:0; line-height:1.4; font-size:25px">We make music models more valuable for musicians and developers by labeling its space through social media.</div>
   </div>
   <div class="ov-lower">
+  <div class="sec2" id="audQrSec">
+    <h2>Audience — scan to join</h2>
+    <img id="audQr" src="/m_qr" alt="scan to join the audience app" style="display:block; width:160px; height:160px; background:#fff; border-radius:8px; padding:6px; margin:2px auto 8px">
+  </div>
+  <div id="groovePanel" class="sec2 gcol">
+    <div class="ovhead" id="grooveHead"><h2 style="margin:0">Groove map</h2><span class="caret" id="grooveCaret">▸</span><button id="grooveExpand" class="mini" title="expand">⤢</button></div>
+    <div id="grooveWrap"><iframe id="grooveFrame" title="Morphing Groove Map"></iframe></div>
+  </div>
   <div class="sec2">
     <h2>Sampling &amp; guidance</h2>
     <div class="slider"><span class="lab">temperature</span><input type="range" id="temperature" min="0.1" max="2.5" step="0.05" value="1.3"><span class="val" id="temperature_v"></span></div>
@@ -325,15 +385,15 @@ let inputs = [], inpId = 0;
 function createRow(inp) {
   const row = document.createElement("div"); row.className = "inrow";
 
-  const sel = document.createElement("select"); sel.className = "tsel";
-  sel.innerHTML = `<option value="text">prompt</option><option value="audio">audio</option>`;
-  sel.value = inp.type;
+  const sel = document.createElement("button"); sel.type = "button"; sel.className = "tsel"; sel.title = "flip prompt / audio";
+  const setType = t => { inp.type = t; sel.innerHTML = "<span>" + (t === "audio" ? "audio" : "prompt") + "</span><span style='opacity:.55'>⇄</span>"; };
+  setType(inp.type || "text");
 
   const mid = document.createElement("div"); mid.className = "inmid";
   function setAudioFile(file) {
     if (!file) return;
     inp.file = file;
-    if (inp.type !== "audio") { inp.type = "audio"; sel.value = "audio"; }   // dropping a file -> audio
+    if (inp.type !== "audio") setType("audio");   // dropping a file -> audio
     renderMid(); onStyleChange();
   }
   mid.addEventListener("dragover", e => { if ([...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files")) { e.preventDefault(); mid.classList.add("dropping"); } });
@@ -353,7 +413,7 @@ function createRow(inp) {
         const f = document.createElement("input");
         f.type = "file"; f.accept = "audio/*,.wav,.flac,.ogg,.mp3,.aiff,.aif"; f.style.display = "none";
         f.addEventListener("change", () => { if (f.files[0]) setAudioFile(f.files[0]); });
-        dz.append(document.createTextNode("⬇ drop an audio file or click to browse"), f);
+        dz.append(document.createTextNode("browse or drop audio"), f);
         mid.appendChild(dz);
       }
     } else {
@@ -364,7 +424,7 @@ function createRow(inp) {
     }
   }
   renderMid();
-  sel.addEventListener("change", () => { inp.type = sel.value; renderMid(); onStyleChange(); });
+  sel.addEventListener("click", () => { setType(inp.type === "audio" ? "text" : "audio"); renderMid(); onStyleChange(); });   // flip
 
   const wWrap = document.createElement("div"); wWrap.className = "wwrap";
   const wlab = document.createElement("span"); wlab.textContent = "w";
@@ -568,7 +628,9 @@ let cubeDots = [], hoverName = null, hoverXY = null, vocabPoints = null, vocabCo
 const CUBE_DIM_MAX = 12;
 let cubeDim = CUBE_DIM_MAX, cubeDimEff = 0;   // how many principal dims the cube shows (slider 1..12, clamped to k)
 let landmarks = [], landmarkCoords = [];      // pins (good/bad) + their PCA coords, for cube dots
-let trailMarks = [], trailBusy = false;       // non-persistent "feeling" breadcrumbs dropped while wandering
+let trailMarks = [], trailBusy = false;       // non-persistent "feeling" breadcrumbs dropped while wandering (AI auto-trail)
+let audMarks = [];                            // PERSISTENT audience breadcrumbs (saved server-side, survive restart)
+let aiLog = [];                               // AI breadcrumbs for the breadcrumb-map list: session-only (non-persistent), kept after they fade off the cube
 let w2On = false, w2Vec = null, w2Vel = null, w2Trail = [], w2Timer = null;   // Wanderer 2 (simulated scout, red)
 function presetLabel(p) { return ((p.items || []).map(it => it.type === "audio" ? (it.fname || "audio") : (it.text || "(empty)")).join(" + ")) || "preset"; }
 async function ensureVocabPoints() {
@@ -748,6 +810,17 @@ function drawCube() {
     cubeDots.push({ px: p[0], py: p[1], name: "👍 " + trailMarks[i].description, emb: trailMarks[i].embedding, kind: "trail" });
   }
 
+  // Persistent audience breadcrumbs (saved server-side) — same look as the AI trail but NO fade.
+  for (let i = 0; i < audMarks.length; i++) {
+    const co = embToCoords(audMarks[i].embedding); if (!co) continue;
+    const p = P(pcaToU(co));
+    x.fillStyle = "rgba(35,210,154,.9)";
+    x.beginPath(); x.arc(p[0], p[1], 3, 0, 7); x.fill();
+    x.fillStyle = "rgba(201,188,255,.85)";
+    x.font = "15px -apple-system,sans-serif"; x.fillText(audMarks[i].description, p[0] + 5, p[1] + 3);
+    cubeDots.push({ px: p[0], py: p[1], name: "👍 " + audMarks[i].description, emb: audMarks[i].embedding, kind: "aud" });
+  }
+
   // Wanderer 2 (simulated scout): red dot + red fading tail.
   if (w2On && w2Vec) {
     for (let i = 1; i < w2Trail.length; i++) {
@@ -769,7 +842,8 @@ function drawCube() {
   const pc = P(pcaToU(pcaCoords));
   x.fillStyle = "#fff"; x.strokeStyle = "#23c08a"; x.lineWidth = 2;
   x.beginPath(); x.arc(pc[0], pc[1], 6, 0, 7); x.fill(); x.stroke();
-  cubeDots.push({ px: pc[0], py: pc[1], name: "current", emb: null, kind: "current" });
+  x.fillStyle = "rgba(231,233,238,.95)"; x.font = "10px -apple-system,sans-serif"; x.fillText("Hackspace Hackathon 2026", pc[0] + 10, pc[1] + 3);
+  cubeDots.push({ px: pc[0], py: pc[1], name: "Hackspace Hackathon 2026", emb: null, kind: "current" });
 
 
   // Hover label.
@@ -1251,7 +1325,19 @@ $("seqBpm").addEventListener("change",pushSeq);
 $("seqBpmN").addEventListener("input",e=>{ const v=Math.max(40,Math.min(200,Math.round(+e.target.value||94))); $("seqBpm").value=v; seqSetBpm(v); });
 $("seqBpmN").addEventListener("change",pushSeq);
 $("seqClear").addEventListener("click",()=>{ seqInit(); buildSeqGrid(); pushSeq(); });
-$("seqHead").addEventListener("click",()=>{ const b=$("seqBody"), open=b.style.display==="none"; b.style.display=open?"":"none"; $("seqCaret").textContent=open?"▲":"▼"; const gi=$("giPanel"); if(gi) gi.style.display=open?"none":""; if(open) buildSeqGrid(); });
+// Bottom dock: one segmented bar toggles the Step sequencer / Groove instrument (one open at a time).
+let dockOpen = null;
+function dockShow(which) {
+  dockOpen = (dockOpen === which) ? null : which;
+  $("seqPanel").style.display = dockOpen === "seq" ? "block" : "none";
+  $("giPanel").style.display = dockOpen === "gi" ? "block" : "none";
+  $("dockSeq").classList.toggle("active", dockOpen === "seq");
+  $("dockGi").classList.toggle("active", dockOpen === "gi");
+  if (dockOpen === "seq") buildSeqGrid();
+  if (dockOpen === "gi" && window.__giRedraw) window.__giRedraw();   // (re)draw groove pad/strip when shown
+}
+$("dockSeq").addEventListener("click", () => dockShow("seq"));
+$("dockGi").addEventListener("click", () => dockShow("gi"));
 seqSetBpm(+$("seqBpm").value);
 buildSeqGrid();
 
@@ -1281,7 +1367,7 @@ function sendLiveNotes() {
 }
 function midiNoteOn(m) {
   heldNotes.add(snapToGrid(m));
-  if ($("seqBody").style.display === "none") $("seqHead").click();   // reveal the grid
+  if (dockOpen !== "seq") dockShow("seq");   // reveal the grid in the dock
   buildSeqGrid(); updateHeldHint(); sendLiveNotes();                 // light the held cell(s)
 }
 function midiNoteOff(m) { heldNotes.delete(snapToGrid(m)); buildSeqGrid(); updateHeldHint(); sendLiveNotes(); }
@@ -1369,41 +1455,50 @@ async function restyleLive() {
   } catch (e) { log("⚠️ " + e.message); }
 }
 
-// ---- Floating word bubbles (instruments & genres) -------------------------
+// ---- Ingredients tag field (instruments & genres) -------------------------
 const INSTRUMENTS = ["piano","electric guitar","acoustic guitar","bass guitar","double bass","violin","cello","viola","harp","flute","clarinet","oboe","bassoon","saxophone","trumpet","trombone","tuba","french horn","drum kit","808 drums","hi-hats","congas","bongos","timpani","marimba","xylophone","vibraphone","organ","hammond organ","synthesizer","synth pad","moog bass","rhodes piano","accordion","harmonica","banjo","mandolin","ukulele","sitar","koto","erhu","tabla","djembe","steel drums","kalimba","theremin","bagpipes","fiddle","harpsichord","clavinet","vocoder","choir","string section","brass section"];
 const GENRES = ["jazz","blues","rock","punk","heavy metal","death metal","pop","synthpop","electronic","EDM","house","deep house","techno","trance","dubstep","drum and bass","jungle","ambient","lo-fi","hip hop","trap","R&B","soul","funk","disco","reggae","ska","dub","classical","baroque","orchestral","opera","folk","country","bluegrass","gospel","latin","salsa","bossa nova","samba","flamenco","afrobeat","k-pop","indie","shoegaze","grunge","breakbeat","downtempo","vaporwave","cinematic"];
-const WORDS = [...INSTRUMENTS.map(w => ({ w, kind: "inst" })), ...GENRES.map(w => ({ w, kind: "genre" }))];
 
-(function initBubbles() {
-  const box = $("bubbles"), N = 16, items = [];
-  const pick = () => WORDS[Math.floor(Math.random() * WORDS.length)];
-  function reset(it, below) {
-    const W = box.clientWidth || 320, H = box.clientHeight || 190, p = pick();
-    it.word = p.w; it.el.textContent = p.w; it.el.dataset.word = p.w;
-    it.el.className = "bubble " + (p.kind === "inst" ? "inst" : "genre");
-    it.vy = 14 + Math.random() * 26;
-    it.swayAmp = 5 + Math.random() * 12; it.swayFreq = 0.5 + Math.random() * 1.1; it.phase = Math.random() * 6.28;
-    it.x = Math.random() * Math.max(20, W - 120);
-    it.y = below ? H + Math.random() * H : Math.random() * H;
+// Click an ingredient: append it to the first text prompt (or make a new one).
+function addWordToStyle(word) {
+  const target = inputs.find(i => i.type === "text");
+  if (target) {
+    target.text = target.text.trim() ? target.text.trim() + ", " + word : word;
+    const row = [...$("inputs").querySelectorAll(".inrow")].find(r => r._inp === target);
+    const field = row && row.querySelector('input[type=text]'); if (field) field.value = target.text;
+  } else {
+    addInput("text", word, 1);
   }
-  for (let i = 0; i < N; i++) {
-    const el = document.createElement("div"); el.className = "bubble genre"; box.appendChild(el);
-    const it = { el }; reset(it, false); items.push(it);
-    el.addEventListener("pointerdown", ev => { ev.preventDefault(); startBubbleDrag(el.dataset.word, ev.clientX, ev.clientY); });
+  onStyleChange();
+}
+
+(function initIngredients() {
+  const list = $("ingList");
+  function group(label, words, kind, second) {
+    const h = document.createElement("div"); h.className = "igrp" + (second ? " g2" : ""); h.textContent = label;
+    const cloud = document.createElement("div"); cloud.className = "icloud";
+    words.forEach(w => {
+      const chip = document.createElement("div"); chip.className = "ing " + kind; chip.dataset.word = w;
+      chip.append(document.createTextNode(w));
+      // Drag past a small threshold = drag-into-Style; a plain click = add to the active prompt.
+      chip.addEventListener("pointerdown", ev => {
+        ev.preventDefault();
+        const sx = ev.clientX, sy = ev.clientY; let dragging = false;
+        const mv = e => { if (!dragging && Math.hypot(e.clientX - sx, e.clientY - sy) > 5) { dragging = true; cleanup(); startBubbleDrag(w, e.clientX, e.clientY); } };
+        const up = () => { cleanup(); if (!dragging) addWordToStyle(w); };
+        function cleanup() { document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up); }
+        document.addEventListener("pointermove", mv); document.addEventListener("pointerup", up);
+      });
+      cloud.appendChild(chip);
+    });
+    list.append(h, cloud);
   }
-  let last = performance.now();
-  function tick(t) {
-    const dt = Math.min(0.05, (t - last) / 1000); last = t;
-    const H = box.clientHeight || 190;
-    for (const it of items) {
-      it.phase += dt; it.y -= it.vy * dt;
-      const x = it.x + Math.sin(it.phase * it.swayFreq) * it.swayAmp;
-      it.el.style.transform = `translate(${x}px, ${it.y}px)`;
-      if (it.y < -44) reset(it, true);
-    }
-    requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
+  group("Instruments", INSTRUMENTS, "inst", false);
+  group("Genres", GENRES, "genre", true);
+  $("ingFilter").addEventListener("input", e => {
+    const q = e.target.value.trim().toLowerCase();
+    list.querySelectorAll(".ing").forEach(c => c.classList.toggle("hidden", !!q && !c.dataset.word.toLowerCase().includes(q)));
+  });
 })();
 
 // ---- Drag a word bubble into the Style section ----------------------------
@@ -1617,7 +1712,9 @@ async function dropFeelingMark(emb) {
   try {
     const desc = await feelingFor(emb);
     trailMarks.push({ description: desc, embedding: emb, t: performance.now() });
-    if (trailMarks.length > 12) trailMarks.shift();   // safety cap (each also fades out in 20s)
+    if (trailMarks.length > 12) trailMarks.shift();   // safety cap (each also fades out in 20s) — for the CUBE
+    aiLog.push({ description: desc, embedding: emb });   // for the breadcrumb-map LIST (session-only, outlives the cube fade)
+    if (aiLog.length > 200) aiLog.shift();
     drawCube();
   } catch (e) {} finally { trailBusy = false; }
 }
@@ -1735,12 +1832,72 @@ async function loadLandmarks() {
   } catch (e) {}
 }
 loadLandmarks();
+async function loadAudMarks() {   // restore persisted audience breadcrumbs on load
+  try { const r = await fetch('/audience/marks'); if (r.ok) { audMarks = (await r.json()).marks || []; drawCube(); } } catch (e) {}
+}
+loadAudMarks();
+
+// ---- Breadcrumb map: list AI + audience feelings with their embedding coordinates ----
+// Shows how the app accumulates human-language interpretations of points in the raw
+// 768-d embedding space (each phrase pinned to its PCA coordinates).
+function bcCoordStr(emb) {
+  const co = embToCoords(emb);
+  if (!co) return "(awaiting map…)";
+  return "[ " + co.map(v => v.toFixed(2)).join(", ") + " ]";
+}
+function renderBreadcrumbs() {
+  const el = $("bcList"); if (!el) return;
+  const items = [];
+  for (let i = audMarks.length - 1; i >= 0; i--) items.push(audMarks[i]);
+  for (let i = aiLog.length - 1; i >= 0; i--) items.push(aiLog[i]);   // AI marks linger in the list (session) even after fading off the cube
+  if (!items.length) { el.textContent = "no breadcrumbs yet — turn on slow drift, or open the audience channel."; return; }
+  el.textContent = items.slice(0, 60).map(it => {
+    const v = (it.embedding || []).slice(0, 5).map(x => Number(x).toFixed(3)).join(", ");
+    return it.description + "\n  " + v + " ...";
+  }).join("\n\n");
+}
+renderBreadcrumbs();
+setInterval(renderBreadcrumbs, 1000);
+
+// Turn ON slow drift + Wanderer 2 by default, once the cube's PCA map is ready.
+(function startDefaults(n){
+  n = n || 0;
+  if (pcaData && pcaData.k) {
+    if (!lastVec) lastVec = pcaData.mean.slice();   // give drift a starting point so it wanders on load
+    if ($("drift").checked && !driftTimer) $("drift").dispatchEvent(new Event("change"));
+    if ($("wander2").checked && !w2On) $("wander2").dispatchEvent(new Event("change"));
+  } else if (n < 40) { setTimeout(() => startDefaults(n + 1), 300); }
+})();
 
 // Expand/collapse the embedded groove map.
-$("grooveExpand").addEventListener("click", () => {
+$("grooveExpand").addEventListener("click", (e) => {
+  e.stopPropagation();   // don't also trigger the header collapse
+  const f = $("grooveFrame"); if (f && !f.src) f.src = "/groove";   // lazy-load on first open
+  $("groovePanel").classList.remove("gcol");                         // fullscreen implies expanded
+  const c = $("grooveCaret"); if (c) c.textContent = "▼";
   const ex = $("groovePanel").classList.toggle("expanded");
   $("grooveExpand").textContent = ex ? "🗗" : "⤢";
+  setTimeout(fitGroove, 60);
 });
+// Scale the groove iframe (680px design) to fit the card; collapse via the header.
+function fitGroove() {
+  const panel = $("groovePanel"), wrap = $("grooveWrap"), frame = $("grooveFrame");
+  if (!panel || !wrap || !frame || panel.classList.contains("gcol")) return;
+  const availW = wrap.clientWidth, availH = wrap.clientHeight;
+  if (!availW || !availH) return;
+  const scale = Math.max(0.1, Math.min(2.5, availW / 680));
+  frame.style.width = "680px";
+  frame.style.height = (availH / scale) + "px";
+  frame.style.transform = "scale(" + scale + ")";
+}
+$("grooveFrame").addEventListener("load", fitGroove);
+window.addEventListener("resize", fitGroove);
+$("grooveHead").addEventListener("click", () => {
+  const col = $("groovePanel").classList.toggle("gcol");
+  const c = $("grooveCaret"); if (c) c.textContent = col ? "▸" : "▼";
+  if (!col) { const f = $("grooveFrame"); if (f && !f.src) f.src = "/groove"; setTimeout(fitGroove, 60); }   // lazy-load + fit on expand
+});
+fitGroove(); setTimeout(fitGroove, 300);
 
 
 // ---- Inline Groove instrument -------------------------------------------------
@@ -1925,8 +2082,8 @@ $("grooveExpand").addEventListener("click", () => {
       b.addEventListener('click',()=>loadAgr(name)); el.appendChild(b); });
   }
 
-  $('giHead').addEventListener('click',()=>{ const b=$('giBody'), open=b.style.display==='none'; b.style.display=open?'':'none'; $('giCaret').textContent=open?'▲':'▼'; const sp=$('seqPanel'); if(sp) sp.style.display=open?'none':''; if(open){ drawPad(); drawStrip(); } });
-  window.addEventListener('resize',()=>{ if($('giBody').style.display!=='none'){ drawPad(); drawStrip(); } });
+  window.__giRedraw = () => { drawPad(); drawStrip(); };   // dock shows the groove panel -> (re)draw
+  window.addEventListener('resize',()=>{ if($('giBody').offsetParent){ drawPad(); drawStrip(); } });
 
   load();
 })();
@@ -1947,11 +2104,12 @@ $("grooveExpand").addEventListener("click", () => {
     try{ const r=await fetch('/danmaku',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({style:styleText(),n:8})});
          const j=await r.json(); if(j && j.comments) queue.push(...j.comments); }catch(e){}
   }
-  function spawn(text){
+  function spawn(text, aud){
     const c=box(), t=now(); let lane=-1;
     for(let i=0;i<LANES;i++){ if(t>=laneFree[i]){ lane=i; break; } }
     if(lane<0) return false;               // every lane busy -> tell caller to requeue
     const el=document.createElement('div'); el.className='dm-item'; el.textContent=text;
+    if(aud) el.classList.add('aud');       // audience bullets are visually distinct
     el.style.top=(baseTop+lane*laneH)+'px'; c.appendChild(el);
     const w=el.offsetWidth, cw=c.clientWidth||window.innerWidth;
     el.style.left=cw+'px';
@@ -1982,6 +2140,23 @@ $("grooveExpand").addEventListener("click", () => {
   function start(){ on=true; refill(); refillT=setInterval(refill, 15000); drain(); }
   function stop(){ on=false; if(refillT)clearInterval(refillT); if(spawnT)clearTimeout(spawnT); refillT=spawnT=null; queue=[]; box().innerHTML=''; laneFree.fill(0); }
   $("dmToggle").addEventListener('change', e=>{ e.target.checked ? start() : stop(); });
+  // Audience comments ALWAYS show — even with every lane busy or the AI loop OFF
+  // (each bullet runs its own CSS animation, so it scrolls without start()).
+  window.__audienceSay = (text) => { if (!spawn(String(text), true)) { laneFree[0]=0; spawn(String(text), true); } };
+})();
+
+// ---- Audience channel: live SSE from phones (/m) -> main screen ----
+const _audES = new EventSource('/live');
+_audES.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; }
+  if (m.type === 'say' && window.__audienceSay) window.__audienceSay(m.text);
+  else if (m.type === 'feel') { const emb = lastVec ? lastVec.slice() : ((pcaData && pcaData.k) ? coordsToEmb(pcaCoords) : null); if (emb) { audMarks.push({ description: m.text, embedding: emb }); if (audMarks.length > 500) audMarks.shift(); drawCube(); fetch('/audience/mark', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ description: m.text, embedding: emb }) }).catch(()=>{}); } }   // PERSISTENT audience breadcrumb: show now + save server-side
+  else if (m.type === 'state') { const cb=$("audOpen"); if(cb) cb.checked = !!m.open; const st=$("audState"); if(st) st.textContent = m.open ? "channel OPEN" : "channel closed"; }
+};
+(function(){
+  const cb=$("audOpen"); if(!cb) return;
+  cb.addEventListener('change', (e)=>{
+    fetch('/audience/open', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ open: e.target.checked }) }).catch(()=>{});
+  });
 })();
 </script>
 </body>

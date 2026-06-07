@@ -18,6 +18,7 @@ sample apps downloaded them), found automatically via the MAGENTA_HOME default.
 """
 
 import io
+import os
 import json
 import time
 import asyncio
@@ -28,7 +29,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -80,6 +81,194 @@ def index():
 def groove_cube_page():
     """Standalone Groove Cube instrument: morph .stt-style grooves over a fixed beat."""
     return (HERE / "static" / "groove_cube.html").read_text()
+
+
+# ---------------------------------------------------------------------------
+# ---- Audience participation channel ----
+#
+# A public-demo channel. Phones open /m, answer two questions, and POST each
+# separately. The server fans every submission out over ONE SSE stream (/live)
+# that the main screen (index.html) subscribes to and renders:
+#   - a FEELING (Q1 "how does the music feel?")        -> a non-persistent
+#     breadcrumb dropped on the cube.
+#   - a COMMENT (Q2 "how would you describe this music?") -> a danmaku bullet
+#     scrolling across the main screen.
+# Everything here is in-memory (nothing persisted). The channel is CLOSED by
+# default (anti-abuse); an operator opens it from the main screen with the admin
+# token printed below at startup. There are NO LLM calls on this path — audience
+# text is broadcast raw (only stripped/cleaned/capped).
+# ---------------------------------------------------------------------------
+_aud_open = False                 # channel CLOSED by default (anti-abuse)
+_aud_subscribers: set = set()     # set of asyncio.Queue, one per live SSE client
+_aud_rate: dict = {}              # ip -> last-post epoch seconds (per-IP throttle)
+
+# Public base URL the AUDIENCE uses (the Tailscale Funnel host) — this is what the
+# QR encodes, independent of how the operator opened the main screen (localhost vs
+# funnel). Override with PUBLIC_URL=... in the environment.
+PUBLIC_URL = (os.environ.get("PUBLIC_URL") or "https://tsuis-macbook-pro.tail2214e5.ts.net").rstrip("/")
+_aud_join = PUBLIC_URL + "/m"
+_aud_qr_cache = None
+
+
+def _aud_broadcast(obj):
+    """Push one JSON object to every connected SSE subscriber (never blocks)."""
+    s = json.dumps(obj)
+    for q in list(_aud_subscribers):
+        try:
+            q.put_nowait(s)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _aud_clean(text, cap):
+    """Coerce to str, drop control chars, strip, and trim to `cap` characters."""
+    s = text if isinstance(text, str) else str(text or "")
+    s = "".join(ch for ch in s if ord(ch) >= 32 and ord(ch) != 127)
+    return s.strip()[:cap]
+
+
+async def _aud_post(request: Request, kind: str, cap: int):
+    """Shared handler for /audience/say and /audience/feel.
+
+    Order (per contract): closed -> 403; clean+cap text; empty -> 400;
+    rate-check -> 429; then broadcast the raw text and ack. No LLM calls.
+    """
+    if not _aud_open:
+        return JSONResponse({"error": "closed"}, status_code=403)
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001
+        data = {}
+    clean = _aud_clean(data.get("text", ""), cap)
+    if not clean:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    ip = request.client.host if request.client else "?"
+    now = time.time()
+    if now - _aud_rate.get(ip, 0) < 2.5:
+        return JSONResponse({"error": "slow down"}, status_code=429)
+    _aud_rate[ip] = now
+    _aud_broadcast({"type": kind, "text": clean})
+    return {"ok": True}
+
+
+@app.get("/m")
+def audience_page():
+    """The phone-facing audience page (placed next to GET / and /groovecube)."""
+    return FileResponse(HERE / "static" / "m.html")
+
+
+@app.get("/m_qr")
+def audience_qr():
+    """SVG QR code of the public audience URL (PUBLIC_URL + /m) for the main screen
+    to display, so the audience can scan to join. Cached (the URL is fixed)."""
+    global _aud_qr_cache
+    if _aud_qr_cache is None:
+        try:
+            import segno
+            buf = io.BytesIO()
+            segno.make(_aud_join, error="m").save(buf, kind="svg", scale=6, border=2,
+                                                  dark="#0b0d12", light="#ffffff")
+            _aud_qr_cache = buf.getvalue()
+        except Exception:  # noqa: BLE001  (segno missing -> show the URL as text so the card isn't broken)
+            _aud_qr_cache = (
+                '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="60">'
+                '<rect width="100%" height="100%" fill="#fff"/>'
+                f'<text x="6" y="34" font-size="9" fill="#000">{_aud_join}</text></svg>'
+            ).encode()
+    return Response(content=_aud_qr_cache, media_type="image/svg+xml")
+
+
+@app.get("/audience/status")
+def audience_status():
+    """Whether the channel is currently accepting input (phones poll this ~4s)."""
+    return {"open": _aud_open, "join": _aud_join}
+
+
+@app.post("/audience/say")
+async def audience_say(request: Request):
+    """Q2 'describe this music' -> a danmaku bullet (max 80 chars)."""
+    return await _aud_post(request, "say", 80)
+
+
+@app.post("/audience/feel")
+async def audience_feel(request: Request):
+    """Q1 'how does the music feel' -> a cube breadcrumb (max 40 chars)."""
+    return await _aud_post(request, "feel", 40)
+
+
+@app.post("/audience/open")
+async def audience_open(request: Request):
+    """Open/close the channel (toggled from the main screen, no auth); broadcasts 'state'."""
+    global _aud_open
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001
+        data = {}
+    _aud_open = bool(data.get("open"))
+    _aud_broadcast({"type": "state", "open": _aud_open})
+    return {"open": _aud_open}
+
+
+@app.get("/live")
+async def audience_live():
+    """SSE hub: emit current state on connect, then say/feel events, with a
+    ~15s ': ping' keepalive so the Tailscale Funnel proxy doesn't drop it."""
+    q = asyncio.Queue()
+    _aud_subscribers.add(q)
+    await q.put(json.dumps({"type": "state", "open": _aud_open}))
+
+    async def gen():
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=15)
+                    yield f"data: {msg}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            _aud_subscribers.discard(q)
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+# Persistent store for audience breadcrumbs (feeling + cube position) — unlike the
+# ephemeral on-screen trail, these are saved to disk and survive restarts.
+AUD_MARKS_PATH = HERE / "audience_marks.json"
+_aud_marks: list[dict] = []
+_aud_marks_lock = threading.Lock()
+try:
+    _aud_marks = json.loads(AUD_MARKS_PATH.read_text())
+except Exception:  # noqa: BLE001
+    _aud_marks = []
+
+
+@app.post("/audience/mark")
+async def audience_mark(request: Request):
+    """Persist one audience breadcrumb (feeling text + 768-d cube position). Called by
+    the main screen when a feeling arrives, so the bookmark survives restarts."""
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001
+        data = {}
+    desc = _aud_clean(data.get("description", ""), 40)
+    emb = data.get("embedding") or []
+    if not desc or not isinstance(emb, list) or len(emb) < 8:
+        return JSONResponse({"error": "bad mark"}, status_code=400)
+    mark = {"id": f"am{int(time.time() * 1000)}", "description": desc,
+            "embedding": [float(x) for x in emb], "t": time.time()}
+    with _aud_marks_lock:
+        _aud_marks.append(mark)
+        if len(_aud_marks) > 500:
+            del _aud_marks[:len(_aud_marks) - 500]
+        AUD_MARKS_PATH.write_text(json.dumps(_aud_marks))
+    return {"ok": True, "count": len(_aud_marks)}
+
+
+@app.get("/audience/marks")
+def audience_marks_list():
+    """All stored audience breadcrumbs, for the main screen to draw on load."""
+    return {"marks": [{"id": m["id"], "description": m["description"],
+                       "embedding": m["embedding"]} for m in _aud_marks]}
 
 
 @app.get("/status")
@@ -316,14 +505,18 @@ NAV_SYSTEM = (
     "space of musical styles and pins 'places' they like, each with their own "
     "description. You also have a built-in vocabulary of instruments and genres "
     "(listed in the message) whose positions are known. Given the user's request, "
-    "their saved places, and the vocabulary, choose how to travel by calling exactly "
-    "one tool:\n"
-    "- go_to_landmark: one saved place clearly matches the request.\n"
-    "- blend_landmarks: the request sits between or combines saved places.\n"
+    "their saved places, any audience feelings, and the vocabulary, choose how to travel "
+    "by calling exactly one tool:\n"
+    "- go_to_landmark: one saved place OR audience feeling clearly matches the request.\n"
+    "- blend_landmarks: the request sits between or combines saved places and/or audience feelings.\n"
     "- compose_from_vocab: the request maps to known genres/instruments — pick the "
     "matching vocabulary words with weights.\n"
     "- rewrite_to_music: novel or abstract requests that fit neither a saved place "
     "nor the vocabulary — rewrite into a concise musical style descriptor.\n"
+    "The message may also list AUDIENCE FEELINGS — short mood phrases the live crowd left at "
+    "points on the map (their ids start with 'am'). Treat them like extra places: use "
+    "go_to_landmark or blend_landmarks with their ids when the request is about the crowd's "
+    "mood/vibe (e.g. 'where the audience felt euphoric', 'follow the crowd', 'the vibe people love').\n"
     "Prefer the user's saved places when they match the vibe; otherwise compose from "
     "the vocabulary; use rewrite only as a last resort."
 )
@@ -331,12 +524,12 @@ NAV_SYSTEM = (
 NAV_TOOLS = [
     {
         "name": "go_to_landmark",
-        "description": "Travel to one saved place that best matches the request.",
+        "description": "Travel to one saved place or audience feeling that best matches the request.",
         "strict": True,
         "input_schema": {
             "type": "object",
             "properties": {
-                "landmark_id": {"type": "string", "description": "id of the saved place"},
+                "landmark_id": {"type": "string", "description": "id of the saved place (lm…) or audience feeling (am…)"},
                 "reasoning": {"type": "string", "description": "one short sentence on why"},
             },
             "required": ["landmark_id", "reasoning"],
@@ -345,7 +538,7 @@ NAV_TOOLS = [
     },
     {
         "name": "blend_landmarks",
-        "description": "Travel to a weighted blend of saved places (a point between them).",
+        "description": "Travel to a weighted blend of saved places and/or audience feelings (a point between them).",
         "strict": True,
         "input_schema": {
             "type": "object",
@@ -746,17 +939,22 @@ def _repel_from_bad(emb, bad_lms, strength=0.2):
     return v.astype(np.float32)
 
 
+def _place_by_id(pid):
+    """Look up an id in the user's saved landmarks OR the audience breadcrumbs."""
+    return _landmark_by_id(pid) or next((m for m in _aud_marks if m.get("id") == pid), None)
+
+
 async def _resolve_nav(action, inp):
     """Turn Claude's navigation decision into a 768-d target embedding."""
     if action == "go_to_landmark":
-        lm = _landmark_by_id(inp.get("landmark_id"))
+        lm = _place_by_id(inp.get("landmark_id"))
         if lm:
             return np.asarray(lm["embedding"], dtype=np.float32), f'landmark: "{lm["description"]}"'
         return None, None
     if action == "blend_landmarks":
         vecs, weights, labels = [], [], []
         for w in inp.get("weights", []):
-            lm = _landmark_by_id(w.get("landmark_id"))
+            lm = _place_by_id(w.get("landmark_id"))
             if not lm:
                 continue
             vecs.append(np.asarray(lm["embedding"], dtype=np.float64).ravel())
@@ -810,27 +1008,42 @@ async def _resolve_nav(action, inp):
 
 
 DANMAKU_SYSTEM = (
-    "You are a Gen-Z listener dropping bullet-screen SUGGESTIONS for how to change "
-    "or steer the music. Given a short description of the current vibe, write {n} "
-    "VERY short directions to take it next — what to add/remove or do more/less of "
-    "(e.g. 'add more 808s fr', 'make it darker 💀', 'needs a breakbeat ngl', 'go "
-    "full ambient', 'more reverb pls', 'bpm up fr', 'give it a drop', 'less synth "
-    "more jazz'). 1-6 words each, imperative/suggestive, lowercase, slangy, emojis "
-    "sparing, no @names. Make them genuinely VARIED — spread across rhythm, bass, "
-    "texture, fx, energy, structure, and genre twists — and do NOT lead with the "
-    "same obvious idea every time. Return ONLY a JSON array of strings."
+    "You are the live bullet-screen (danmaku) chat scrolling over an AI music app "
+    "at a HACKATHON demo. Given a short description of the current vibe, write {n} "
+    "VERY short Gen-Z comments. MIX three kinds, roughly evenly:\n"
+    "1) DIRECTIONS — steer the music (e.g. 'add more 808s fr', 'make it darker 💀', "
+    "'needs a breakbeat ngl', 'go full ambient', 'bpm up fr', 'give it a drop').\n"
+    "2) OPINIONS — react to what's playing (e.g. 'this slaps ngl', 'mid tbh', "
+    "'who approved this 💀', 'actually cooked', 'my ears r healing').\n"
+    "3) RANDOM/IRRELEVANT — sarcastic YouTube-comment energy, often nothing to do "
+    "with the music or riffing on the demo itself (e.g. 'no way an AI made this', "
+    "'first', 'the judges are sleeping', 'is this gonna win 😭', 'demo gods pls', "
+    "'who's here from the pitch', 'my code doesn't even run and this exists').\n"
+    "1-6 words each, lowercase, slangy, emojis sparing, no @names. Make them "
+    "genuinely VARIED and do NOT lead with the same idea every time. "
+    "Return ONLY a JSON array of strings."
 )
 
-_DANMAKU_ANGLES = ["the drums/rhythm", "the bassline", "texture & atmosphere",
-                   "fx & processing (reverb/delay/distortion)", "energy & dynamics",
-                   "arrangement & structure", "an unexpected genre twist", "the tempo/groove"]
+_DANMAKU_ANGLES = [
+    "DIRECTIONS for the drums/rhythm", "DIRECTIONS for the bassline",
+    "DIRECTIONS for texture & fx", "DIRECTIONS: an unexpected genre twist",
+    "OPINIONS reacting to how it sounds (hype or roast)",
+    "OPINIONS: lukewarm/mid takes", "RANDOM sarcastic youtube-comment energy",
+    "RANDOM irrelevant remarks riffing on the hackathon demo itself",
+]
 
 _DANMAKU_POOL = [
+    # directions
     "add more 808s fr", "make it darker 💀", "needs a breakbeat ngl", "go full ambient",
-    "more reverb pls", "bpm up fr", "give it a drop", "less {s} more jazz", "heavier drums fr",
-    "add some bass 🫨", "go lo-fi ngl", "needs hi-hats", "more melodic pls", "switch it up fr",
-    "spicier 🌶️", "darker than {s}", "add vocals fr", "make it dreamy", "more groove pls",
-    "go harder 💪", "needs a build-up", "strip it back fr", "add some strings", "slow it down ngl",
+    "bpm up fr", "give it a drop", "less {s} more jazz", "heavier drums fr",
+    "go lo-fi ngl", "more melodic pls", "switch it up fr", "slow it down ngl",
+    # opinions
+    "this slaps ngl", "ok this cooks", "mid tbh", "{s} but make it good",
+    "actually fire 🔥", "my ears r healing", "who approved this 💀", "lowkey a banger",
+    # random / sarcastic youtube energy
+    "no way an AI made this", "first", "the judges r sleeping 😴", "is this gonna win 😭",
+    "demo gods pls 🙏", "who's here from the pitch", "my code doesn't even run",
+    "this beat carried the demo", "10/10 would clap", "sir this is a hackathon",
 ]
 
 
@@ -857,7 +1070,8 @@ async def danmaku(request: Request):
             model="claude-opus-4-8", max_tokens=400,
             system=DANMAKU_SYSTEM.format(n=n),
             messages=[{"role": "user", "content":
-                       f"The music vibe: {style}. For variety, lean this batch toward {angle}; "
+                       f"The music vibe: {style}. Keep the 3-way mix (directions / opinions / "
+                       f"random sarcastic), but lean this batch a bit toward {angle}; "
                        f"avoid clichés and don't start them all the same."}],
         )
         import re
@@ -925,8 +1139,19 @@ async def navigate(request: Request):
     bad_lms = [lm for lm in _landmarks if lm.get("polarity") == "bad"]
     atlas = "\n".join(f'- {lm["id"]}: "{lm["description"]}"' for lm in good_lms) or "(none saved yet)"
     avoid_txt = "\n".join(f'- "{lm["description"]}"' for lm in bad_lms)
+    # Audience feelings (crowd breadcrumbs): most-recent, deduped by phrase, capped — so Claude can steer to the crowd's vibe.
+    _seen, aud_uniq = set(), []
+    for m in reversed(_aud_marks):
+        d = (m.get("description") or "").lower()
+        if not d or d in _seen:
+            continue
+        _seen.add(d); aud_uniq.append(m)
+        if len(aud_uniq) >= 30:
+            break
+    aud_atlas = "\n".join(f'- {m["id"]}: "{m["description"]}"' for m in aud_uniq)
     vocab_txt = "instruments: " + ", ".join(VOCAB_INSTRUMENTS) + "\ngenres: " + ", ".join(VOCAB_GENRES)
     user_msg = (f"Saved places:\n{atlas}\n\n"
+                + (f"Audience feelings (live crowd reactions left on the map):\n{aud_atlas}\n\n" if aud_uniq else "")
                 + (f"AVOID these places — do NOT travel to or toward them:\n{avoid_txt}\n\n" if bad_lms else "")
                 + f"Vocabulary (compose_from_vocab must use only these words):\n{vocab_txt}\n\n"
                 f'Request: "{prompt}"')
