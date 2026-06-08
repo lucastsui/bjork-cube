@@ -184,16 +184,15 @@
   .ov-bc { bottom:14px; left:50%; transform:translateX(-50%); width:auto; max-width:min(640px,62vw); max-height:calc(50vh - 22px); }
   .ov-left { top:56px; left:0; bottom:0; width:340px; max-height:calc(100vh - 56px); border-radius:0; border-top:0; border-left:0; }
   .ov-right { top:56px; right:0; bottom:0; width:340px; max-height:calc(100vh - 56px); display:flex; flex-direction:column; overflow:hidden; border-radius:0; border-top:0; border-right:0; }
-  #groovePanel { display:flex; flex-direction:column; min-height:0; overflow:hidden; }   /* Groove map: collapsible section in the scroll area, below Audience */
-  #groovePanel.gcol #grooveWrap { display:none; }            /* collapsed -> just the header */
-  #grooveHead { margin-bottom:10px; flex:none; justify-content:flex-start; }
-  #grooveHead .caret { color:var(--muted); font-size:12px; margin-left:auto; }
+  /* Groove map = a dock panel (3rd dock segment). Sized so the 680px-design app renders at ~normal size. */
+  #groovePanel { left:354px; transform:none; bottom:62px; width:auto; max-width:min(712px, calc(100vw - 368px)); max-height:calc(100vh - 130px); display:none; flex-direction:column; min-height:0; overflow:hidden; }
+  #grooveHead { margin-bottom:8px; flex:none; justify-content:flex-end; }
   #grooveHead .mini { margin-left:8px; }
-  #grooveWrap { height:300px; position:relative; overflow:hidden; border-radius:8px; background:var(--ink-900); }
-  /* the groove app is designed for ~680px; render the iframe at that width and scale the whole thing to fit the card (JS sets exact height + scale) */
-  #grooveFrame { position:absolute; top:0; left:0; width:680px; height:1200px; transform-origin:top left; transform:scale(0.45); border:0; background:var(--ink-900); display:block; }
-  .ov-lower { flex:1 1 auto; overflow:auto; min-height:0; }   /* scrollable: Audience QR + Groove + Sampling + PCA */
-  #groovePanel.expanded { position:fixed; left:40px; right:40px; top:64px; bottom:40px; width:auto; max-width:none; max-height:none; z-index:40; background:rgba(24,27,34,.98); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  #grooveWrap { flex:1 1 auto; min-height:0; position:relative; overflow:hidden; border-radius:8px; background:var(--ink-900); }
+  /* the app is designed for ~680px; render the iframe at that width and scale to fit (JS sets exact height + scale) */
+  #grooveFrame { position:absolute; top:0; left:0; width:680px; height:1200px; transform-origin:top left; transform:scale(0.95); border:0; background:var(--ink-900); display:block; }
+  .ov-lower { flex:1 1 auto; overflow:auto; min-height:0; }   /* scrollable: Audience QR + Sampling + PCA */
+  #groovePanel.expanded { left:40px; right:40px; top:64px; bottom:40px; transform:none; width:auto; max-width:none; max-height:none; z-index:40; background:rgba(24,27,34,.98); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
   #groovePanel.expanded #grooveWrap { height:auto; flex:1 1 auto; }
   /* Groove Cube opens as a full-screen iframe overlay — isolated, can't touch the style cube or stream. */
   /* Inline Groove instrument (native, bottom-center) */
@@ -251,7 +250,13 @@
   <div class="seg">
     <button class="segbtn" id="dockSeq">Step sequencer</button>
     <button class="segbtn" id="dockGi">Groove instrument</button>
+    <button class="segbtn" id="dockMap">Groove map</button>
   </div>
+</div>
+
+<div class="ov ov-bc" id="groovePanel">
+  <div class="ovhead" id="grooveHead"><button id="grooveExpand" class="mini" title="expand" aria-label="Expand the groove map">⤢</button></div>
+  <div id="grooveWrap"><iframe id="grooveFrame" title="Morphing Groove Map"></iframe></div>
 </div>
 
 <div class="ov ov-bc" id="giPanel">
@@ -358,10 +363,6 @@
   <div class="ov-lower">
   <div class="sec2" id="audQrSec">
     <img id="audQr" src="/m_qr" alt="scan to join the audience app" style="display:block; width:160px; height:160px; background:#fff; border-radius:8px; padding:6px; margin:2px auto 8px">
-  </div>
-  <div id="groovePanel" class="sec2 gcol">
-    <div class="ovhead" id="grooveHead"><h2 style="margin:0">Groove map</h2><span class="caret" id="grooveCaret">▸</span><button id="grooveExpand" class="mini" title="expand" aria-label="Expand the groove map">⤢</button></div>
-    <div id="grooveWrap"><iframe id="grooveFrame" title="Morphing Groove Map"></iframe></div>
   </div>
   <div class="sec2">
     <h2>Sampling &amp; guidance</h2>
@@ -1388,13 +1389,17 @@ function dockShow(which) {
   dockOpen = (dockOpen === which) ? null : which;
   $("seqPanel").style.display = dockOpen === "seq" ? "block" : "none";
   $("giPanel").style.display = dockOpen === "gi" ? "block" : "none";
+  $("groovePanel").style.display = dockOpen === "map" ? "flex" : "none";
   $("dockSeq").classList.toggle("active", dockOpen === "seq");
   $("dockGi").classList.toggle("active", dockOpen === "gi");
+  $("dockMap").classList.toggle("active", dockOpen === "map");
   if (dockOpen === "seq") buildSeqGrid();
   if (dockOpen === "gi" && window.__giRedraw) window.__giRedraw();   // (re)draw groove pad/strip when shown
+  if (dockOpen === "map") { const f = $("grooveFrame"); if (f && !f.src) f.src = "/groove"; setTimeout(fitGroove, 60); }   // lazy-load + size to normal
 }
 $("dockSeq").addEventListener("click", () => dockShow("seq"));
 $("dockGi").addEventListener("click", () => dockShow("gi"));
+$("dockMap").addEventListener("click", () => dockShow("map"));
 seqSetBpm(+$("seqBpm").value);
 syncTempoFromSeq(+$("seqBpm").value);   // top-left tempo matches the sequencer bpm on load
 buildSeqGrid();
@@ -2028,18 +2033,16 @@ setInterval(applyA11yLabels, 2500);
 
 // Expand/collapse the embedded groove map.
 $("grooveExpand").addEventListener("click", (e) => {
-  e.stopPropagation();   // don't also trigger the header collapse
+  e.stopPropagation();
   const f = $("grooveFrame"); if (f && !f.src) f.src = "/groove";   // lazy-load on first open
-  $("groovePanel").classList.remove("gcol");                         // fullscreen implies expanded
-  const c = $("grooveCaret"); if (c) c.textContent = "▼";
   const ex = $("groovePanel").classList.toggle("expanded");
   $("grooveExpand").textContent = ex ? "🗗" : "⤢";
   setTimeout(fitGroove, 60);
 });
-// Scale the groove iframe (680px design) to fit the card; collapse via the header.
+// Scale the groove iframe (680px design) to fit its dock panel (~normal size).
 function fitGroove() {
   const panel = $("groovePanel"), wrap = $("grooveWrap"), frame = $("grooveFrame");
-  if (!panel || !wrap || !frame || panel.classList.contains("gcol")) return;
+  if (!panel || !wrap || !frame) return;
   const availW = wrap.clientWidth, availH = wrap.clientHeight;
   if (!availW || !availH) return;
   const scale = Math.max(0.1, Math.min(2.5, availW / 680));
@@ -2049,12 +2052,6 @@ function fitGroove() {
 }
 $("grooveFrame").addEventListener("load", fitGroove);
 window.addEventListener("resize", fitGroove);
-$("grooveHead").addEventListener("click", () => {
-  const col = $("groovePanel").classList.toggle("gcol");
-  const c = $("grooveCaret"); if (c) c.textContent = col ? "▸" : "▼";
-  if (!col) { const f = $("grooveFrame"); if (f && !f.src) f.src = "/groove"; setTimeout(fitGroove, 60); }   // lazy-load + fit on expand
-});
-fitGroove(); setTimeout(fitGroove, 300);
 
 
 // ---- Inline Groove instrument -------------------------------------------------
