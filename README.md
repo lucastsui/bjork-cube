@@ -1,3 +1,5 @@
+<img width="1728" height="1117" alt="Screenshot 2026-06-09 at 12 06 44 PM" src="https://github.com/user-attachments/assets/1da297cf-56fa-4a5a-8388-7ef4ecc6d173" />
+
 # Morphing Music Map
 
 A local web app that turns **Magenta RealTime 2** (MRT2) into a continuous, live-steerable music stream you navigate as a full-screen PCA hypercube of the model's latent style space — playable with a step sequencer, a groove instrument, a MIDI controller, real-time glitch FX, an autonomous scout, and a phone audience-participation channel.
