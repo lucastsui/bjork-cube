@@ -13,8 +13,10 @@ model and exposes every generation input we can drive from a web UI:
   - notes / drums  : optional advanced control arrays (raw JSON pass-through)
   - duration       : length of generated audio (converted to frames; 25 frames = 1s)
 
-The model weights live at ~/Documents/Magenta/magenta-rt-v2 (the same place the
-sample apps downloaded them), found automatically via the MAGENTA_HOME default.
+The model weights ship inside the project at ./magenta_home/magenta-rt-v2 and the
+model code is vendored at ./magenta_rt, so the project runs off the shelf. We set
+MAGENTA_HOME to the in-project copy below (an explicit MAGENTA_HOME env var still
+overrides, e.g. to point at a shared ~/Documents/Magenta install).
 """
 
 import io
@@ -34,6 +36,12 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Fil
 from fastapi.staticfiles import StaticFiles
 
 HERE = pathlib.Path(__file__).parent
+
+# Run off the shelf: point Magenta at the in-project weights
+# (./magenta_home/magenta-rt-v2) unless the operator already set MAGENTA_HOME.
+# MUST be set before magenta_rt is imported (paths.py reads it at import time).
+os.environ.setdefault("MAGENTA_HOME", str(HERE / "magenta_home"))
+
 FRAMES_PER_SECOND = 25  # 25 frames == 1 second of audio (per the model docs)
 
 app = FastAPI(title="MRT2 Demo")

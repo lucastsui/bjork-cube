@@ -1,0 +1,39 @@
+# Björk Cube — Python dependencies (Python 3.12, Apple Silicon / MLX)
+#
+# The Magenta RealTime 2 model CODE is vendored in ./magenta_rt (incl. its
+# _vendor/sequence_layers import hook), so it is NOT installed from PyPI here.
+# These are that code's third-party runtime deps plus the web-server deps used
+# by server.py. The 13 GB model WEIGHTS live in ./magenta_home (gitignored) —
+# see README "Installation".
+#
+#   python3.12 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+
+# --- Magenta RT2 (mlx) runtime deps ---
+ai-edge-litert==2.1.5          # TFLite interpreter (MusicCoCa)
+mlx==0.31.2
+flax==0.12.7
+recurrentgemma[jax]==1.0.1
+jax==0.10.1
+jaxlib==0.10.1
+numpy==2.4.4
+scipy==1.17.1
+einops==0.8.2
+safetensors==0.7.0
+typeguard==2.13.3
+jaxtyping==0.3.10
+typing_extensions==4.15.0
+google-cloud-storage==3.11.0
+huggingface-hub==1.15.0
+simple-term-menu==1.6.6
+click==8.3.3
+librosa==0.11.0
+resampy==0.4.3
+sentencepiece==0.2.1
+soundfile==0.13.1
+
+# --- web server / app (server.py) ---
+fastapi==0.136.3
+uvicorn[standard]==0.49.0      # [standard] pulls websockets for WS /stream
+anthropic==0.105.2
+segno==1.6.6

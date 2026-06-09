@@ -7,8 +7,9 @@
 #   caffeinate -dis nohup ~/Desktop/MRT2_demo/serve_keepalive.sh >/dev/null 2>&1 &
 #
 # Stop it:  pkill -f serve_keepalive ; pkill -f "uvicorn server:app" ; pkill caffeinate
-cd ~/Desktop/MRT2_demo || exit 1
-source ~/code/playground/.venv/bin/activate
+cd "$(dirname "$0")" || exit 1
+# Prefer a project-local .venv; fall back to the playground venv.
+if [ -f .venv/bin/activate ]; then source .venv/bin/activate; else source ~/code/playground/.venv/bin/activate; fi
 set -a; [ -f .env ] && source .env; set +a
 LOG=/tmp/mrt2_server.log
 while true; do

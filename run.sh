@@ -1,8 +1,14 @@
 #!/bin/zsh
-# Launch the MRT2 demo webapp.
-# Uses the playground venv where magenta-rt[mlx] + fastapi are installed.
+# Launch the Björk Cube webapp.
+# Prefer a project-local .venv (off-the-shelf clones: python -m venv .venv &&
+# pip install -r requirements.txt); fall back to the playground venv.
 cd "$(dirname "$0")"
-source ~/code/playground/.venv/bin/activate
+if [ -f .venv/bin/activate ]; then
+  source .venv/bin/activate
+else
+  source ~/code/playground/.venv/bin/activate
+fi
+# Model weights + code are in-project; server.py sets MAGENTA_HOME=./magenta_home.
 # Navigation ("take me somewhere…") uses Claude. The key lives in .env (gitignored,
 # chmod 600); edit that file to change it. Falls back to an exported env var.
 [ -f .env ] && source .env

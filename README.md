@@ -4,7 +4,7 @@ A local web app that turns **Magenta RealTime 2** (MRT2) into a continuous, live
 
 - **UI title:** "Morphing Music Map" · **browser tab:** "Music Morphing Space" · **repo:** `bjork-cube` (formerly "Björk Cube")
 - **GitHub (public):** https://github.com/lucastsui/bjork-cube
-- The app is **self-contained** — it has no external service dependencies. (An earlier "Groove map" panel that called out to a DGX Spark groove service has been removed.)
+- The app is **self-contained** — no external service dependencies, and the **Magenta model code and weights ship inside the project** (`magenta_rt/` + `magenta_home/`), so it runs off the shelf. (An earlier "Groove map" panel that called out to a DGX Spark groove service has also been removed.)
 
 ---
 
@@ -32,19 +32,31 @@ Claude (`claude-opus-4-8`) powers the `/navigate`, `/feeling`, and `/danmaku` en
 ### Requirements
 
 - **Apple Silicon Mac** — the model runs on MLX / Metal.
-- **MRT2 weights** at `~/Documents/Magenta/magenta-rt-v2/` (`checkpoints/mrt2_base.safetensors`, ~9.2 GB).
-- A Python venv with the dependencies below. The project uses `~/code/playground/.venv`.
+- **Python 3.12.**
 - An **Anthropic API key** (optional, but needed for "go →" navigation, feelings, and danmaku).
+
+The Magenta **model code is vendored** in `magenta_rt/` (committed) and the **weights live in `magenta_home/`** (`magenta-rt-v2/{checkpoints,models,resources}`, ~13 GB). `server.py` sets `MAGENTA_HOME` to that in-project folder automatically, so there is no dependency on `~/Documents/Magenta`.
 
 ### 1. Set up the environment
 
-There is no `requirements.txt` yet; the venv at `~/code/playground/.venv` provides:
-
+```bash
+cd ~/Desktop/MRT2_demo
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 ```
-magenta-rt[mlx]   fastapi   uvicorn   anthropic   soundfile   numpy   segno
+
+`requirements.txt` pins the model's third-party runtime deps (MLX, `ai-edge-litert`, `librosa`, …) plus the web-server deps. `segno` (pure-Python QR for the audience join code) is included; if it were missing, the QR endpoint falls back to rendering the URL as text. The existing `~/code/playground/.venv` already has everything, and `run.sh` uses it automatically when no local `.venv` is present.
+
+### 1a. Weights (fresh clones only)
+
+The ~13 GB of weights are **gitignored** (too large for GitHub), so a fresh `git clone` does **not** include them. On this machine they are already in place at `magenta_home/magenta-rt-v2/`. To populate a fresh clone, copy them from an existing install:
+
+```bash
+mkdir -p magenta_home
+cp -Rc ~/Documents/Magenta/magenta-rt-v2 magenta_home/   # -c = instant APFS clone, no extra disk
 ```
 
-`segno` (pure-Python QR generation for the audience join code) was added via `uv add segno` — **include it in any redeploy**. If it is missing the QR endpoint gracefully falls back to rendering the URL as text.
+(or re-download via the Magenta sample-app tooling, then point `MAGENTA_HOME` at wherever they landed).
 
 ### 2. Configure secrets
 
@@ -100,6 +112,14 @@ To expose it publicly, use a **Tailscale Funnel** (`tailscale funnel --bg 8000`)
 | `static/m.html` | The phone audience page served at `/m`: two prompts ("feeling" + "steer the course"), SSE-aware so it reflects whether the channel is open. |
 | `static/groove_cube.html` | Standalone groove visualizer served at `/groovecube`; fetches `/groove_library.json` and `/pca` from the same server. |
 
+### Magenta model (vendored in-project)
+
+| Path | Function |
+|---|---|
+| `magenta_rt/` | Vendored Magenta RealTime 2 package (the model code). Includes `mlx/` (the MLX inference system), `musiccoca.py`, `paths.py`, and `_vendor/` (which bundles `sequence_layers` via an import hook). Committed; shadows any pip-installed copy at runtime. |
+| `magenta_home/magenta-rt-v2/` | The model weights — `checkpoints/mrt2_base.safetensors` (9.2 GB, loaded in-process), `resources/` (MusicCoCa TFLite + SpectroStream), `models/` (exported `.mlxfn`). **Gitignored (~13 GB)** — see Installation §1a. `server.py` points `MAGENTA_HOME` here. |
+| `requirements.txt` | Pinned Python deps — the vendored model's third-party libraries (MLX, `ai-edge-litert`, …) plus the web-server deps. |
+
 ### Run / deploy scripts
 
 | Path | Function |
@@ -126,7 +146,7 @@ To expose it publicly, use a **Tailscale Funnel** (`tailscale funnel --bg 8000`)
 | `tools/make_tempo_beats.py` | Regenerates the `tempo_refs/` kick-beat clips. |
 | `agr_txt/` | `.agr` inspection utility — `agr_to_txt.py` dumps an Ableton groove file to readable text; see `agr_txt/README.txt`. |
 
-`.gitignore` excludes: `.env`, `__pycache__`, `outputs/`, `uploads/`, `*.mp3`, `landmarks.json`, `*.bak`, `tempo_refs/`, `.DS_Store`, `groove-swing-*.wav`, `*.zip`, `agr_txt/*.agr`, `audience_marks.json`.
+`.gitignore` excludes: `.env`, `__pycache__`, `outputs/`, `uploads/`, `*.mp3`, `landmarks.json`, `*.bak`, `tempo_refs/`, `.DS_Store`, `groove-swing-*.wav`, `*.zip`, `agr_txt/*.agr`, `audience_marks.json`, **`magenta_home/`** (13 GB weights), **`.venv/`**.
 
 ---
 
