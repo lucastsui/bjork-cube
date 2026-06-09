@@ -1391,23 +1391,13 @@ async def stream(ws: WebSocket):
 
 
 # ---------------------------------------------------------------------------
-# Groove app: serve the pre-built static bundle from groove_dist/.
-# The bundle uses ABSOLUTE ROOT urls — index.html loads /assets/index-*.js and at
-# runtime fetches /straight_drums.wav, /amen.wav, /demoSongA.wav, /demoSongB.wav
-# and /groove_library.json — so those EXACT paths must be served at the root.
-# Routes live in this server's clean namespace (no collision with the API routes).
+# Groove library JSON for the standalone Groove Cube page (/groovecube).
+# groove_cube.html fetches the ABSOLUTE path /groove_library.json, so it must be
+# served at the root. (The embedded "Groove map" app was removed; its bundle, demo
+# audio, and the /groove + /assets routes are gone — only this library file remains.)
 # ---------------------------------------------------------------------------
 GROOVE_DIST = HERE / "groove_dist"
-GROOVE_ROOT_FILES = ["straight_drums.wav", "amen.wav", "demoSongA.wav", "demoSongB.wav", "groove_library.json"]
-
-
-@app.get("/groove")
-def groove_index():
-    """Iframe entry point: the pre-built groove app's index.html."""
-    index = GROOVE_DIST / "index.html"
-    if not index.is_file():
-        return JSONResponse({"error": "groove app not built (groove_dist/index.html missing)."}, status_code=404)
-    return FileResponse(index)
+GROOVE_ROOT_FILES = ["groove_library.json"]
 
 
 def _make_groove_root_route(fn):
@@ -1422,10 +1412,6 @@ def _make_groove_root_route(fn):
 
 for _fn in GROOVE_ROOT_FILES:
     app.add_api_route("/" + _fn, _make_groove_root_route(_fn), methods=["GET"])
-
-# Mount the hashed JS/CSS assets only if present, so an absent groove_dist/ can't crash startup.
-if (GROOVE_DIST / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=GROOVE_DIST / "assets"), name="groove-assets")
 
 if (HERE / "agr").is_dir():
     app.mount("/agr", StaticFiles(directory=HERE / "agr"), name="agr")   # raw .agr files for client-side parsing
